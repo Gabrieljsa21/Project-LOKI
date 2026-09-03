@@ -8,7 +8,9 @@ variações sentadas) com física própria, e um CompanionPanel (janela de
 conversa ancorada à personagem).
 
 Arquitetura completa e decisões de design em [`ARQUITETURA.md`](ARQUITETURA.md).
-Plano original (todas as fases, 0 a 8): `C:\Workspace\Project LOKI.md`.
+Guia completo do fluxo vídeo → importação → catálogo → runtime em
+[`ANIMACOES_GALATEIA.md`](ANIMACOES_GALATEIA.md). Plano original (todas
+as fases, 0 a 8): `C:\Workspace\Project LOKI.md`.
 
 ## A origem do nome
 
