@@ -1,0 +1,24 @@
+[project]
+name = "loki"
+version = "0.1.0"
+description = "Galateia Mascot/LOKI - avatar animado flutuando no desktop, processo separado consumido pela GAIA via named pipe local."
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.6",
+    "keyboard>=0.13",
+    "psutil>=5.9",
+    "Pillow>=10.0",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mascot*", "core*"]
+
+[project.scripts]
+loki = "mascot.process_main:main"

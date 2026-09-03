@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "directions": {
+    "direita": {
+      "idleParaIniciar": {
+        "mae": 8.97,
+        "pixelsAlteradosPct": 5.818
+      },
+      "iniciarParaLoop": {
+        "mae": 7.882,
+        "pixelsAlteradosPct": 6.226
+      },
+      "fechamentoLoop": {
+        "mae": 30.576,
+        "pixelsAlteradosPct": 36.673
+      },
+      "loopParaParar": {
+        "mae": 31.692,
+        "pixelsAlteradosPct": 37.579
+      },
+      "pararParaIdle": {
+        "mae": 16.756,
+        "pixelsAlteradosPct": 20.73
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 89,
+          "quadroPosterior": 1,
+          "mae": 4.524,
+          "pixelsAlteradosPct": 0.532
+        },
+        "loopParaParar": {
+          "quadroAnterior": 80,
+          "quadroPosterior": 0,
+          "mae": 18.509,
+          "pixelsAlteradosPct": 22.192
+        }
+      },
+      "frames": {
+        "iniciar": 90,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "esquerda": {
+      "idleParaIniciar": {
+        "mae": 9.007,
+        "pixelsAlteradosPct": 6.087
+      },
+      "iniciarParaLoop": {
+        "mae": 8.704,
+        "pixelsAlteradosPct": 7.752
+      },
+      "fechamentoLoop": {
+        "mae": 18.897,
+        "pixelsAlteradosPct": 23.398
+      },
+      "loopParaParar": {
+        "mae": 21.191,
+        "pixelsAlteradosPct": 25.845
+      },
+      "pararParaIdle": {
+        "mae": 31.766,
+        "pixelsAlteradosPct": 39.255
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 1,
+          "mae": 4.102,
+          "pixelsAlteradosPct": 0.647
+        },
+        "loopParaParar": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 0,
+          "mae": 16.538,
+          "pixelsAlteradosPct": 19.253
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "subida": {
+      "idleParaIniciar": {
+        "mae": 8.902,
+        "pixelsAlteradosPct": 5.985
+      },
+      "iniciarParaLoop": {
+        "mae": 8.983,
+        "pixelsAlteradosPct": 7.5
+      },
+      "fechamentoLoop": {
+        "mae": 18.058,
+        "pixelsAlteradosPct": 22.453
+      },
+      "loopParaParar": {
+        "mae": 19.113,
+        "pixelsAlteradosPct": 23.827
+      },
+      "pararParaIdle": {
+        "mae": 22.88,
+        "pixelsAlteradosPct": 28.619
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 1,
+          "mae": 5.182,
+          "pixelsAlteradosPct": 1.134
+        },
+        "loopParaParar": {
+          "quadroAnterior": 81,
+          "quadroPosterior": 6,
+          "mae": 13.265,
+          "pixelsAlteradosPct": 13.373
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "descida": {
+      "idleParaIniciar": {
+        "mae": 8.975,
+        "pixelsAlteradosPct": 6.107
+      },
+      "iniciarParaLoop": {
+        "mae": 6.464,
+        "pixelsAlteradosPct": 3.273
+      },
+      "fechamentoLoop": {
+        "mae": 39.403,
+        "pixelsAlteradosPct": 44.241
+      },
+      "loopParaParar": {
+        "mae": 38.8,
+        "pixelsAlteradosPct": 43.277
+      },
+      "pararParaIdle": {
+        "mae": 21.356,
+        "pixelsAlteradosPct": 26.228
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 1,
+          "mae": 3.945,
+          "pixelsAlteradosPct": 0.144
+        },
+        "loopParaParar": {
+          "quadroAnterior": 79,
+          "quadroPosterior": 0,
+          "mae": 15.814,
+          "pixelsAlteradosPct": 17.248
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "superior-direita": {
+      "idleParaIniciar": {
+        "mae": 8.996,
+        "pixelsAlteradosPct": 6.208
+      },
+      "iniciarParaLoop": {
+        "mae": 11.802,
+        "pixelsAlteradosPct": 12.563
+      },
+      "fechamentoLoop": {
+        "mae": 42.91,
+        "pixelsAlteradosPct": 51.089
+      },
+      "loopParaParar": {
+        "mae": 43.515,
+        "pixelsAlteradosPct": 51.355
+      },
+      "pararParaIdle": {
+        "mae": 30.72,
+        "pixelsAlteradosPct": 36.918
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 94,
+          "quadroPosterior": 2,
+          "mae": 3.806,
+          "pixelsAlteradosPct": 0.143
+        },
+        "loopParaParar": {
+          "quadroAnterior": 85,
+          "quadroPosterior": 0,
+          "mae": 14.127,
+          "pixelsAlteradosPct": 14.576
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "superior-esquerda": {
+      "idleParaIniciar": {
+        "mae": 9.036,
+        "pixelsAlteradosPct": 6.142
+      },
+      "iniciarParaLoop": {
+        "mae": 19.635,
+        "pixelsAlteradosPct": 24.284
+      },
+      "fechamentoLoop": {
+        "mae": 41.539,
+        "pixelsAlteradosPct": 47.94
+      },
+      "loopParaParar": {
+        "mae": 43.248,
+        "pixelsAlteradosPct": 50.169
+      },
+      "pararParaIdle": {
+        "mae": 16.592,
+        "pixelsAlteradosPct": 21.153
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 94,
+          "quadroPosterior": 2,
+          "mae": 4.08,
+          "pixelsAlteradosPct": 0.12
+        },
+        "loopParaParar": {
+          "quadroAnterior": 80,
+          "quadroPosterior": 2,
+          "mae": 22.844,
+          "pixelsAlteradosPct": 29.145
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    },
+    "inferior-direita": {
+      "idleParaIniciar": {
+        "mae": 9.508,
+        "pixelsAlteradosPct": 6.819
+      },
+      "iniciarParaLoop": {
+        "mae": 16.279,
+        "pixelsAlteradosPct": 18.928
+      },
+      "fechamentoLoop": {
+        "mae": 41.042,
+        "pixelsAlteradosPct": 47.936
+      },
+      "loopParaParar": {
+        "mae": 41.758,
+        "pixelsAlteradosPct": 48.723
+      },
+      "pararParaIdle": {
+        "mae": 26.807,
+        "pixelsAlteradosPct": 31.962
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 94,
+          "quadroPosterior": 1,
+          "mae": 4.432,
+          "pixelsAlteradosPct": 0.632
+        },
+        "loopParaParar": {
+          "quadroAnterior": 76,
+          "quadroPosterior": 0,
+          "mae": 17.87,
+          "pixelsAlteradosPct": 23.078
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 93
+      }
+    },
+    "inferior-esquerda": {
+      "idleParaIniciar": {
+        "mae": 8.723,
+        "pixelsAlteradosPct": 6.645
+      },
+      "iniciarParaLoop": {
+        "mae": 32.316,
+        "pixelsAlteradosPct": 39.233
+      },
+      "fechamentoLoop": {
+        "mae": 25.248,
+        "pixelsAlteradosPct": 30.117
+      },
+      "loopParaParar": {
+        "mae": 24.944,
+        "pixelsAlteradosPct": 30.117
+      },
+      "pararParaIdle": {
+        "mae": 21.09,
+        "pixelsAlteradosPct": 27.088
+      },
+      "melhoresEmendas": {
+        "iniciarParaLoop": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 3,
+          "mae": 27.161,
+          "pixelsAlteradosPct": 32.385
+        },
+        "loopParaParar": {
+          "quadroAnterior": 95,
+          "quadroPosterior": 1,
+          "mae": 18.747,
+          "pixelsAlteradosPct": 21.773
+        }
+      },
+      "frames": {
+        "iniciar": 96,
+        "loop": 96,
+        "parar": 96
+      }
+    }
+  }
+}

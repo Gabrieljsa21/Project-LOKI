@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "sourceCanvas": {
+    "width": 1280,
+    "height": 720
+  },
+  "sourceCrop": {
+    "left": 217,
+    "top": 2,
+    "right": 1020,
+    "bottom": 717
+  },
+  "cell": {
+    "width": 384,
+    "height": 342
+  },
+  "pivot": {
+    "x": 192,
+    "y": 342
+  },
+  "maxCell": 384,
+  "padding": 24
+}

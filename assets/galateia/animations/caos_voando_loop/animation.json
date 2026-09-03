@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "caos_voando_loop",
+  "character": "galateia",
+  "assetType": "scene",
+  "texture": "spritesheet.webp",
+  "frameCount": 72,
+  "frameDurationMs": 83,
+  "effectiveFps": 12.048,
+  "loop": true,
+  "frameOrder": "row-major",
+  "sourceCanvas": {
+    "width": 1280,
+    "height": 720
+  },
+  "sourceCrop": {
+    "left": 0,
+    "top": 0,
+    "right": 1280,
+    "bottom": 720
+  },
+  "grid": {
+    "columns": 9,
+    "rows": 8,
+    "cellWidth": 612,
+    "cellHeight": 344
+  },
+  "pivot": {
+    "x": 296,
+    "y": 343
+  },
+  "unusedCells": []
+}

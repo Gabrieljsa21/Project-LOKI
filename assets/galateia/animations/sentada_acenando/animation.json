@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "sentada_acenando",
+  "character": "galateia",
+  "assetType": "character",
+  "texture": "spritesheet.webp",
+  "frameCount": 72,
+  "frameDurationMs": 83,
+  "effectiveFps": 12.048,
+  "loop": false,
+  "frameOrder": "row-major",
+  "sourceCanvas": {
+    "width": 1280,
+    "height": 720
+  },
+  "sourceCrop": {
+    "left": 217,
+    "top": 2,
+    "right": 1020,
+    "bottom": 717
+  },
+  "grid": {
+    "columns": 9,
+    "rows": 8,
+    "cellWidth": 384,
+    "cellHeight": 342
+  },
+  "pivot": {
+    "x": 192,
+    "y": 342
+  },
+  "unusedCells": []
+}

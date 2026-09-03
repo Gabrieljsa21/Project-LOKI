@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Segredos (nunca commitar - repo público)
+.env
+.env.*
+!.env.example
+
+# Dados gerados em runtime (config/posição real do usuário - nunca commitado)
+data/mascot_config.json
+data/mascot_posicao.json
+
+# Relatórios/cache gerados pelo pipeline de animações
+cache/
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

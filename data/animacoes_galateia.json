@@ -1,0 +1,696 @@
+{
+  "schemaVersion": 1,
+  "fps": 12,
+  "maxCell": 384,
+  "geometryPadding": 24,
+  "atlasQuality": 90,
+  "animations": [
+    {
+      "id": "flutuando_idle",
+      "source": "E:\\Downloads\\Sprites\\OLD 2.0\\Character_floating_in_idle_anima\\Character_floating_in_idle_anima_selected-idle\\frames",
+      "sourceFps": 12,
+      "loop": true,
+      "restoreCanvas": {
+        "width": 1280,
+        "height": 720,
+        "left": 396,
+        "top": 50
+      }
+    },
+    {
+      "id": "flutuando_para_sentada",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_para_sentada.mp4",
+      "loop": false,
+      "skipStart": 1
+    },
+    {
+      "id": "sentada_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_para_flutuando.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_balancando-pernas",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_balancando-pernas.mp4",
+      "loop": true
+    },
+    {
+      "id": "sentada_pensando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_pensando.mp4",
+      "loop": true
+    },
+    {
+      "id": "sentada_caindo-no-sono",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_caindo-no-sono.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_deitando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_deitando.mp4",
+      "loop": false
+    },
+    {
+      "id": "dormindo_trocando-lado",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\dormindo_trocando-lado.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_espreguicando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_espreguicando.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_olhando-ao-redor",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_olhando-ao-redor.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_acenando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_acenando.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_bocejando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_bocejando.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_brincando-cabelo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_brincando-cabelo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_arrumando-cabelo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_arrumando-cabelo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_enrolando-cabelo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_enrolando-cabelo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_enrolando-cabelo_corando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_enrolando-cabelo_corando.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_jogando-cabelo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_jogando-cabelo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_rindo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_rindo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_risada-esnobe",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_risada-esnobe.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_gargalhada_quase-caindo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_gargalhada_quase-caindo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_gargalhada_caindo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_gargalhada_caindo.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_segurando-riso",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_segurando-riso.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_rindo_sem-graca",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\sentada_rindo_sem-graca.mp4",
+      "loop": false
+    },
+    {
+      "id": "sentada_tehepero",
+      "sources": [
+        {
+          "path": "E:\\Downloads\\Sprites\\Gaia\\sentada_para_tehepero.mp4"
+        },
+        {
+          "path": "E:\\Downloads\\Sprites\\Gaia\\sentada_tehepero_para_sentada.mp4",
+          "skipStart": 1
+        }
+      ],
+      "loop": false
+    },
+    {
+      "id": "flutuando_direita_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_direita_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_direita_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_direita_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_direita_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_direita_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_esquerda_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_esquerda_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_esquerda_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_esquerda_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_esquerda_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_esquerda_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_subida_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_subida_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_subida_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_subida_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_subida_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_subida_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_descida_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_descida_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_descida_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_descida_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_descida_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_descida_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_superior-direita_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-direita_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_superior-direita_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-direita_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_superior-direita_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-direita_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_superior-esquerda_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-esquerda_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_superior-esquerda_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-esquerda_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_superior-esquerda_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_superior-esquerda_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_inferior-direita_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-direita_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_inferior-direita_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-direita_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_inferior-direita_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-direita_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_inferior-esquerda_iniciar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-esquerda_iniciar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_inferior-esquerda_loop",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-esquerda_loop.mp4",
+      "loop": true
+    },
+    {
+      "id": "flutuando_inferior-esquerda_parar",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_inferior-esquerda_parar.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_direita_para_esquerda",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_direita_para_esquerda.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_esquerda_para_direita",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_esquerda_para_direita.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_descida_para_subida",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_descida_para_subida.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_subida_para_descida",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_subida_para_descida.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_perdida",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_perdida.mp4",
+      "loop": false
+    },
+    {
+      "id": "flutuando_cortina-abrindo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\Curtains_opening_to_reveal_Galateia_202608282130.mp4",
+      "assetType": "scene",
+      "background": "#14a22c",
+      "tolerance": 58,
+      "feather": 18,
+      "loop": false
+    },
+    {
+      "id": "flutuando_para_agarrada",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\flutuando_para_agarrada.mp4",
+      "background": "#08e914",
+      "tolerance": 88,
+      "feather": 24,
+      "loop": false
+    },
+    {
+      "id": "arrastada_loop_calma",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_calma.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_brava",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_brava.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_chorando-medo",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_chorando-medo.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_furiosa",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_furiosa.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_panico-1",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_panico-1.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_panico-2",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_panico-2.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_loop_emburrada",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_loop_emburrada.mp4",
+      "loop": true
+    },
+    {
+      "id": "arrastada_para_queda-joelho",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_para_queda-joelho.mp4",
+      "loop": false
+    },
+    {
+      "id": "arrastada_para_queda-bunda",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\arrastada_para_queda-bunda.mp4",
+      "loop": false
+    },
+    {
+      "id": "queda-bunda_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\queda-bunda_para_flutuando.mp4",
+      "loop": false
+    },
+    {
+      "id": "queda-joelhos_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\queda-joelhos_para_flutuando.mp4",
+      "loop": false
+    },
+    {
+      "id": "transformacao_inicio",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\transformacao_inicio.mp4",
+      "assetType": "scene",
+      "loop": false
+    },
+    {
+      "id": "transformacao_fim",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\transformacao_fim.mp4",
+      "assetType": "scene",
+      "loop": false
+    },
+    {
+      "id": "ssj3_invocacao-dragao",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\transformacao_para_SSJ3.mp4",
+      "assetType": "scene",
+      "loop": false
+    },
+    {
+      "id": "ssj3_para_chamuscada",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\SSJ3_para_chamuscada.mp4",
+      "assetType": "scene",
+      "loop": false
+    },
+    {
+      "id": "chamuscada_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\chamuscada_para_flutuando.mp4",
+      "assetType": "scene",
+      "loop": false
+    },
+    {
+      "id": "agarrada_para_queda-heroica",
+      "source": "E:\\Downloads\\Sprites\\agarrada_para_queda-heroica.mp4",
+      "loop": false,
+      "state": {
+        "origin": "agarrada",
+        "destination": "queda-heroica",
+        "fallback": "queda-heroica_loop",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "drag",
+          "fall",
+          "heroic"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "brinde_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\brinde_para_flutuando.mp4",
+      "loop": false,
+      "state": {
+        "origin": "brinde",
+        "destination": "flutuando",
+        "fallback": "flutuando_idle",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "toast",
+          "floating"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "caos_voando_loop",
+      "source": "E:\\Downloads\\Sprites\\Caos_loop.mp4",
+      "loop": true,
+      "state": {
+        "origin": "caos-voando",
+        "destination": "caos-voando",
+        "fallback": null,
+        "interruptible": true,
+        "tags": [
+          "loop",
+          "scene",
+          "secondary-character",
+          "flight"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "flutuando_para_brinde",
+      "source": "E:\\Downloads\\Sprites\\flutuando_para_brinde.mp4",
+      "loop": false,
+      "state": {
+        "origin": "flutuando",
+        "destination": "brinde",
+        "fallback": null,
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "toast"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "flutuando_para_leque",
+      "source": "E:\\Downloads\\Sprites\\flutuando_para_leque.mp4",
+      "loop": false,
+      "state": {
+        "origin": "flutuando",
+        "destination": "leque",
+        "fallback": null,
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "fan"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "flutuando_para_substituicao-ninja",
+      "source": "E:\\Downloads\\Sprites\\flutuando_para_substituicao-ninja.mp4",
+      "loop": false,
+      "state": {
+        "origin": "flutuando",
+        "destination": "substituicao-ninja",
+        "fallback": "substituicao-ninja_para_flutuando",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "ninja",
+          "teleport"
+        ],
+        "inferred": false,
+        "speedMultiplier": 2.988
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "flutuando_para_trazendo-caos",
+      "source": "E:\\Downloads\\Sprites\\flutuando_para_trazendo-caos.mp4",
+      "loop": false,
+      "state": {
+        "origin": "flutuando",
+        "destination": "com-caos",
+        "fallback": "trazendo-caos_para_flutuando",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "chaos"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "leque_esnobe_para_neutra",
+      "source": "E:\\Downloads\\Sprites\\Leque-Esnobe_Leque.mp4",
+      "loop": false,
+      "state": {
+        "origin": "leque",
+        "destination": "leque",
+        "fallback": null,
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "fan",
+          "neutral"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "leque_ironica_loop",
+      "source": "E:\\Downloads\\Sprites\\leque-ironica_loop.mp4",
+      "loop": true,
+      "state": {
+        "origin": "leque",
+        "destination": "leque",
+        "fallback": null,
+        "interruptible": true,
+        "tags": [
+          "idle",
+          "fan",
+          "ironic"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "leque_esnobe_loop",
+      "source": "E:\\Downloads\\Sprites\\leque_esnobe_loop.mp4",
+      "loop": true,
+      "state": {
+        "origin": "leque",
+        "destination": "leque",
+        "fallback": null,
+        "interruptible": true,
+        "tags": [
+          "idle",
+          "fan",
+          "snobbish"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "leque_neutra_para_esnobe",
+      "source": "E:\\Downloads\\Sprites\\Leque_Leque-Esnobe.mp4",
+      "loop": false,
+      "state": {
+        "origin": "leque",
+        "destination": "leque",
+        "fallback": "leque_esnobe_loop",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "fan",
+          "snobbish"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "leque_sorriso_loop",
+      "source": "E:\\Downloads\\Sprites\\leque_sorriso_loop.mp4",
+      "loop": true,
+      "state": {
+        "origin": "leque",
+        "destination": "leque",
+        "fallback": null,
+        "interruptible": true,
+        "tags": [
+          "idle",
+          "fan",
+          "smile"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "pouso-heroico_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\pouso-heroico_para_flutuando.mp4",
+      "loop": false,
+      "state": {
+        "origin": "pouso-heroico",
+        "destination": "flutuando",
+        "fallback": "flutuando_idle",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "recovery",
+          "heroic",
+          "floating"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "queda-heroica_loop",
+      "source": "E:\\Downloads\\Sprites\\queda-heroica_loop.mp4",
+      "loop": true,
+      "state": {
+        "origin": "queda-heroica",
+        "destination": "queda-heroica",
+        "fallback": null,
+        "interruptible": true,
+        "tags": [
+          "movement",
+          "fall",
+          "heroic"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "queda-heroica_para_pouso",
+      "source": "E:\\Downloads\\Sprites\\queda-heroica_para_pouso.mp4",
+      "loop": false,
+      "state": {
+        "origin": "queda-heroica",
+        "destination": "pouso-heroico",
+        "fallback": "pouso-heroico_para_flutuando",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "fall",
+          "landing",
+          "heroic"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "substituicao-ninja_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\substituicao_ninja_para_flutuando.mp4",
+      "loop": false,
+      "state": {
+        "origin": "substituicao-ninja",
+        "destination": "flutuando",
+        "fallback": "flutuando_idle",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "ninja",
+          "floating"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    },
+    {
+      "id": "trazendo-caos_para_flutuando",
+      "source": "E:\\Downloads\\Sprites\\trazendo-caos_para_flutuando.mp4",
+      "loop": false,
+      "state": {
+        "origin": "com-caos",
+        "destination": "flutuando-com-caos",
+        "fallback": "flutuando_idle",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "scene",
+          "chaos",
+          "flight"
+        ],
+        "inferred": false
+      },
+      "assetType": "scene"
+    }
+  ]
+}
