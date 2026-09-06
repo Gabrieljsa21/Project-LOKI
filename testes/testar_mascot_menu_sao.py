@@ -19,16 +19,18 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raiz do projeto
 
-from PySide6.QtCore import QPoint, QPointF, Qt
-from PySide6.QtGui import QWheelEvent
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QKeyEvent, QWheelEvent
 from PySide6.QtWidgets import QApplication
 
 app = QApplication.instance() or QApplication([])
 app.setQuitOnLastWindowClosed(False)
 
-from mascot import platform_windows
+from mascot import platform_windows, state_catalog
 from mascot.animation_controller import AnimationController
 from mascot.asset_repository import AssetRepository
+from mascot.gesture_wheel import CAMINHO_CONFIG, acoes_configuradas, carregar_configuracao
+from mascot.gesture_wheel_editor import CATEGORIA_TUDO, IDS_ESCOLHIVEIS, categoria_animacao
 from mascot.safety import SafetyController
 from mascot.window import MascotWindow
 
@@ -234,30 +236,282 @@ checar("clicar 'Voz' ciclou o MESMO modo do CompanionPanel (nunca um estado pró
 bombear(1.0)
 
 checar(
-    "'Ações' e 'GAIA' nascem marcadas como desabilitadas (achado ao vivo: GPT sugeriu, usuário endossou)",
-    menu_sao_module.IDS_DESABILITADOS == {"acoes", "gaia"},
+    "nenhum item nasce desabilitado (2026-09-03: os 4 ganharam conteúdo real)",
+    menu_sao_module.IDS_DESABILITADOS == frozenset(),
     menu_sao_module.IDS_DESABILITADOS,
 )
 circulo_acoes = menu._circulos[2]
 circulo_gaia = menu._circulos[3]
-checar("círculo 'Ações' está marcado desabilitado", circulo_acoes._desabilitado is True)
-checar("círculo 'GAIA' está marcado desabilitado", circulo_gaia._desabilitado is True)
-checar("círculo 'Conversar'/'Voz' NÃO estão desabilitados", menu._circulos[0]._desabilitado is False and menu._circulos[1]._desabilitado is False)
+checar("círculo 'Ações' NÃO está desabilitado", circulo_acoes._desabilitado is False)
+checar("círculo 'Configurações' NÃO está desabilitado", circulo_gaia._desabilitado is False)
 
-menu.abrir()
-bombear(1.0)
-circulo_acoes.enterEvent(None)
-checar("hover em item desabilitado ainda expande (revela o rótulo)", menu._hover_estado == "opening")
-checar("mas NUNCA destaca cor (self._hover fica False mesmo em hover de verdade)", circulo_acoes._hover is False)
-circulo_acoes.leaveEvent(None)
-bombear(0.3)
+# "Ações" - MESMA lógica da bandeja ("Forçar animação"), só lista
+# transições válidas a partir do estado lógico atual, sem catálogo inteiro
+menu_animacao = menu._construir_menu_forcar_animacao()
+validas_esperadas = sorted(
+    e.id for e in state_catalog.transicoes_validas_a_partir_de(mascot_app.controller.estado_logico)
+    if e.id not in state_catalog.IDS_OCULTOS_DE_SELECAO
+)
+rotulos_menu = [a.text() for a in menu_animacao.actions()]
+checar(
+    "menu de 'Ações' lista as MESMAS transições válidas do estado atual (playground da bandeja)",
+    rotulos_menu == validas_esperadas if validas_esperadas else rotulos_menu == ["(nenhuma a partir do estado atual)"],
+    rotulos_menu,
+)
+
+# "Configurações" - abre o modal NATIVO local (mascot/modal_configuracoes.py),
+# nunca precisa de bridge/GAIA rodando (funciona igual em modo demonstração)
+checar("mascot_app ainda não tem modal de configurações construído", mascot_app._modal_configuracoes is None)
+menu._abrir_configuracoes()
+checar("'Configurações' constrói o modal (instância única em MascotApp)", mascot_app._modal_configuracoes is not None)
+checar("modal de configurações fica visível", mascot_app._modal_configuracoes.isVisible())
+checar(
+    "configurações têm as cinco abas principais (sem emoji, achado ao vivo 2026-09-04: 'os icones sao inuteis')",
+    [mascot_app._modal_configuracoes._abas.tabText(i) for i in range(mascot_app._modal_configuracoes._abas.count())]
+    == ["Geral", "Aparência", "Ações", "Movimento", "Sistema"],
+)
+pills = mascot_app._modal_configuracoes._editor_gesture_wheel._botoes_pill
+checar(
+    "Ações separa o editor em uma pill por categoria + \"Tudo\" (2026-09-04: redesign, substitui "
+    "as sub-abas antigas; \"Tudo\" acrescentada 2026-09-05 pro arraste valer entre categorias; "
+    "\"Outras\" virou pasta 2026-09-06 - \"Leque\" mora dentro dela agora, sem pill própria)",
+    list(pills.keys())
+    == ["Tudo", "Movimento", "Especiais", "Sentada", "Flutuando", "Transições", "Expressões", "Outras"],
+)
+# "Tudo" (2026-09-05) - mostra TODAS as escolhíveis juntas, não só as da
+# categoria marcada; é aqui que o arraste entre categorias diferentes faz
+# sentido (ver `_mover_na_ordem`).
+editor = mascot_app._modal_configuracoes._editor_gesture_wheel
+pills[CATEGORIA_TUDO].click()
+checar(
+    "pill \"Tudo\" mostra TODAS as animações escolhíveis, não só de uma categoria",
+    set(editor._linhas.keys()) == set(IDS_ESCOLHIVEIS),
+    len(editor._linhas),
+)
+
+# "Outras" (2026-09-06, "'Outras' n vai ser tag de animação, vai ser
+# tipo uma pasta contendo categorias") - selecionar uma sub-categoria
+# (sem passar pela pill dela mesma, que não existe mais) filtra igual a
+# qualquer pill normal e marca "Outras" como ativa visualmente.
+editor._selecionar_categoria("Leque")
+checar(
+    "sub-categoria \"Leque\" (dentro da pasta \"Outras\") filtra igual a uma pill normal",
+    set(editor._linhas.keys())
+    == {aid for aid in IDS_ESCOLHIVEIS if categoria_animacao(aid) == "Leque"}
+    and len(editor._linhas) > 0,
+    len(editor._linhas),
+)
+checar(
+    "pill \"Outras\" fica marcada como ativa quando uma sub-categoria dela está selecionada",
+    pills["Outras"].isChecked() and not any(p.isChecked() for nome, p in pills.items() if nome != "Outras"),
+)
+# Volta pra "Tudo" - os testes de arraste logo abaixo esperam TODAS as
+# animações visíveis em `_linhas` (contaminação já vista antes com
+# "leque"/`forcar_estado`, mesmo mecanismo aqui: categoria filtrada some
+# de `_linhas`, quebrando quem espera achar qualquer id ali).
+editor._selecionar_categoria(CATEGORIA_TUDO)
+
+# Arraste real (2026-09-05, "cada card... tem q permitir arrastar e mover,
+# trocando de posicao com outros") - `_mover_na_ordem` é o que o
+# `eventFilter` chama depois de um drop de verdade; testado direto aqui
+# (sem simular QDrag) pela MESMA razão dos outros testes de física deste
+# arquivo - o efeito (nova posição em `_ordem`) importa, não o evento
+# bruto do Qt.
+ordem_antes = list(editor._ordem)
+origem, destino = ordem_antes[5], ordem_antes[1]
+editor._mover_na_ordem(origem, destino, depois=False)
+checar(
+    "arrastar um card pra ANTES de outro reordena _ordem de verdade",
+    editor._ordem.index(origem) == editor._ordem.index(destino) - 1,
+    (editor._ordem.index(origem), editor._ordem.index(destino)),
+)
+editor._mover_na_ordem(origem, destino, depois=True)
+checar(
+    "arrastar um card pra DEPOIS de outro também funciona",
+    editor._ordem.index(origem) == editor._ordem.index(destino) + 1,
+    (editor._ordem.index(origem), editor._ordem.index(destino)),
+)
+checar("_mover_na_ordem preserva o TOTAL de ids (nada duplicado/sumido)", sorted(editor._ordem) == sorted(ordem_antes))
+
+# Indicador de inserção (2026-09-05, "ficando aquela linha entre os cards
+# onde ele vai ser inserido") - linha única reaproveitada, nunca duplicada
+# no layout mesmo mostrada em cima de linhas diferentes em sequência.
+linha_um, linha_dois = editor._linhas[editor._ordem[0]], editor._linhas[editor._ordem[1]]
+checar("indicador de inserção começa escondido/fora do layout", editor._lista_layout.indexOf(editor._indicador_insercao) == -1)
+editor._mostrar_indicador_em(linha_um, depois=False)
+checar(
+    "indicador aparece IMEDIATAMENTE ANTES da linha-alvo (metade de cima)",
+    editor._lista_layout.indexOf(editor._indicador_insercao) == editor._lista_layout.indexOf(linha_um) - 1,
+)
+editor._mostrar_indicador_em(linha_dois, depois=True)
+checar(
+    "mostrar de novo em outra linha MOVE o mesmo indicador (nunca duplica no layout)",
+    editor._lista_layout.indexOf(editor._indicador_insercao) == editor._lista_layout.indexOf(linha_dois) + 1,
+)
+editor._esconder_indicador()
+checar("esconder tira o indicador do layout de novo", editor._lista_layout.indexOf(editor._indicador_insercao) == -1)
+
+# Página passou a ser DERIVADA da posição em `_ordem` entre as MARCADAS
+# (não mais um spinbox "Ordem" por linha) - as 3 primeiras da ordem atual
+# ficam na página 1 com limite=3. `_aplicar()` grava de VERDADE em
+# `data/gesture_wheel.json` (o MESMO arquivo do app real, ver nota de
+# isolamento fraco no topo do arquivo) - faz backup/restaura os bytes
+# originais depois, pra não sobrescrever a configuração real do usuário.
+_backup_gesture_wheel_json = CAMINHO_CONFIG.read_bytes() if CAMINHO_CONFIG.is_file() else None
+try:
+    editor._selecionadas = set(editor._ordem[:6])
+    editor._limite = 3
+    editor._spin_limite.setValue(3)
+    editor._aplicar()
+    salvas = acoes_configuradas(carregar_configuracao())
+finally:
+    if _backup_gesture_wheel_json is None:
+        CAMINHO_CONFIG.unlink(missing_ok=True)
+    else:
+        CAMINHO_CONFIG.write_bytes(_backup_gesture_wheel_json)
+paginas_por_id = dict(salvas)
+checar(
+    "página salva bate com a posição em _ordem entre as marcadas, respeitando o limite",
+    [paginas_por_id[aid] for aid in editor._ordem[:6]] == [1, 1, 1, 2, 2, 2],
+    [paginas_por_id.get(aid) for aid in editor._ordem[:6]],
+)
+
+# Botão de remover imagem (ícone de lixeira, 2026-09-05) - substitui o
+# menu "⋮" (só tinha uma opção lá dentro, "usar iniciais automáticas").
+# Nome do teste evita colocar o emoji em si na string (console deste
+# ambiente não decodifica caractere fora do BMP, tipo 🗑 - crasharia o
+# `print` do `checar`, não é limitação da UI/Qt).
+aid_teste = editor._ordem[0]
+botao_remover = editor._botoes_remover_imagem[aid_teste]
+editor._imagens.pop(aid_teste, None)  # rascunho em memória - garante ponto de partida sem imagem, não toca disco
+editor._atualizar_miniatura(aid_teste)
+checar("botão de remover imagem nasce desabilitado sem imagem custom", not botao_remover.isEnabled())
+editor._imagens[aid_teste] = "assets/gesture_wheel/icons/inexistente.png"
+editor._atualizar_miniatura(aid_teste)
+checar("botão de remover imagem habilita assim que uma imagem é atribuída", botao_remover.isEnabled())
+editor._limpar_imagem(aid_teste)
+checar("botão de remover imagem desabilita de novo depois de remover a imagem", not botao_remover.isEnabled())
+
+primeira_instancia = mascot_app._modal_configuracoes
+menu._abrir_configuracoes()
+checar("clicar de novo reaproveita a MESMA instância (nunca duas fontes de verdade)", mascot_app._modal_configuracoes is primeira_instancia)
+mascot_app._modal_configuracoes.hide()
+menu._obter_bridge = lambda: None  # restaura modo demonstração pro resto do teste
+
+# "🔄 Reiniciar Mascot" na bandeja (2026-09-06, pedido do usuário: "coloca
+# o botão de riniciar loki tbm na bandeja") - fonte única em `MascotApp.
+# reiniciar_mascot`, o modal só delega (ver `ModalConfiguracoes.
+# _reiniciar_mascot`). `subprocess.Popen`/`QApplication.quit`/
+# `confirmar_acao` mockados - nunca deixar isso realmente fechar o
+# processo do teste.
+acoes_bandeja = {a.text(): a for a in mascot_app.tray.contextMenu().actions()}
+checar("bandeja tem a ação \"Reiniciar Mascot\"", "🔄 Reiniciar Mascot" in acoes_bandeja)
+chamadas_popen = []
+chamadas_quit = []
+_popen_original = process_main.subprocess.Popen
+_quit_original = process_main.QApplication.quit
+_confirmar_original = process_main.confirmar_acao
+process_main.subprocess.Popen = lambda *a, **k: chamadas_popen.append((a, k))
+process_main.QApplication.quit = lambda: chamadas_quit.append(True)
+process_main.confirmar_acao = lambda *a, **k: True
+try:
+    mascot_app.reiniciar_mascot()
+finally:
+    process_main.subprocess.Popen = _popen_original
+    process_main.QApplication.quit = _quit_original
+    process_main.confirmar_acao = _confirmar_original
+checar("reiniciar_mascot sobe um processo novo (subprocess.Popen chamado 1x)", len(chamadas_popen) == 1)
+checar(
+    "reiniciar_mascot sobe -m mascot.process_main",
+    chamadas_popen and chamadas_popen[0][0][0] == [sys.executable, "-m", "mascot.process_main"],
+)
+checar("reiniciar_mascot fecha o processo atual DEPOIS de subir o novo", chamadas_quit == [True])
 
 estado_antes = menu._estado
 menu._ao_clicar("acoes")
-checar("clicar 'Ações' (desabilitado) NÃO fecha o menu nem finge uma ação", menu._estado == estado_antes)
-menu._ao_clicar("gaia")
-checar("clicar 'GAIA' (idem) também não faz nada", menu._estado == estado_antes)
+checar("clicar 'Ações' fecha o menu normalmente (não é mais item inerte)", menu._estado in ("closing", "closed"))
+checar("clicar 'Ações' abre a Gesture Wheel contextual", menu._gesture_wheel.esta_aberta)
+config_roda = carregar_configuracao()
+configuradas = acoes_configuradas(config_roda)
+# 2026-09-05: a roda deixou de se limitar às transições válidas do estado
+# ATUAL ("o proposito dessa tela é listar todas as animacoes q posso
+# ativar, porem n se limitar as opcoes do estado atual") - mostra
+# qualquer id configurado que ainda exista no catálogo (a preparação pro
+# estado exigido acontece só no clique, ver `testar_gesture_wheel.py`/
+# `AnimationController.preparar_para`).
+ids_permitidos = [
+    aid for aid in state_catalog.CATALOGO if aid not in state_catalog.IDS_OCULTOS_DE_SELECAO
+]
+if configuradas:
+    primeira_pagina = min(pagina for animation_id, pagina in configuradas if animation_id in ids_permitidos)
+    esperadas_roda = [
+        animation_id for animation_id, pagina in configuradas
+        if pagina == primeira_pagina and animation_id in ids_permitidos
+    ][:max(1, min(8, int(config_roda.get("quantidade_maxima", 8))))]
+else:
+    esperadas_roda = validas_esperadas[:8]  # bootstrap raro (sem config salva) ainda restringe ao estado atual
+checar(
+    "Gesture Wheel mostra TODAS as ações configuradas (não só as válidas do estado atual), respeitando página e limite",
+    [item.id for item in menu._gesture_wheel._itens_visiveis] == esperadas_roda,
+)
+if len(menu._gesture_wheel._paginas) > 1:
+    pagina_antes = menu._gesture_wheel._indice_pagina
+    menu._gesture_wheel.trocar_pagina(1)
+    checar("rolagem troca a página plana da roda", menu._gesture_wheel._indice_pagina != pagina_antes)
+    menu._gesture_wheel.trocar_pagina(-1)  # volta pra 1ª página antes do teste de filtro abaixo
+
+# Filtro por Ctrl+F (2026-09-06, pedido do usuário: "qnd mouse tiver na
+# gaia ou em alguma animacao, apertar ctrl+f filtraria essas animações").
+wheel = menu._gesture_wheel
+checar(
+    "mouse sobre a Gaia (centro) conta como 'sobre a Gaia ou animação'",
+    wheel._sobre_gaia_ou_animacao(wheel._centro),
+)
+if wheel._itens_visiveis:
+    centro_item_0 = wheel._centro_item(0)
+    checar(
+        "mouse sobre um medalhão conta como 'sobre a Gaia ou animação'",
+        wheel._sobre_gaia_ou_animacao(centro_item_0),
+    )
+ponto_longe = QPointF(wheel._centro.x() + 10_000, wheel._centro.y() + 10_000)
+checar("mouse longe de tudo NÃO conta como 'sobre a Gaia ou animação'", not wheel._sobre_gaia_ou_animacao(ponto_longe))
+
+itens_antes_filtro = list(wheel._itens_todos)
+wheel._mostrar_campo_filtro()
+checar("Ctrl+F abre o campo de filtro (visível)", wheel._campo_filtro.isVisible())
+
+alvo = itens_antes_filtro[0]
+termo_unico = alvo.id.split("_")[0]  # pedaço do id, só pra achar pelo menos essa 1 animação
+wheel._campo_filtro.setText(termo_unico)
+checar(
+    "filtro reduz a lista (mostra só quem bate com o termo digitado)",
+    all(termo_unico in f"{item.id} {item.rotulo}".casefold() for pagina in wheel._paginas for item in pagina),
+)
+checar(
+    "animação-alvo continua aparecendo depois do filtro",
+    any(item.id == alvo.id for pagina in wheel._paginas for item in pagina),
+)
+
+wheel._campo_filtro.setText("termo-que-nao-bate-em-nada-12345")
+checar("filtro sem nenhum resultado não crasha (fica vazio)", wheel._itens_visiveis == [])
+
+wheel._esconder_campo_filtro()
+checar("esconder o filtro limpa o texto e o campo some", not wheel._campo_filtro.isVisible() and wheel._campo_filtro.text() == "")
+checar(
+    "esconder o filtro restaura TODAS as animações de novo",
+    sorted(item.id for pagina in wheel._paginas for item in pagina) == sorted(item.id for item in itens_antes_filtro),
+)
+checar("roda continua ABERTA depois de mexer no filtro (focus não fecha ela)", wheel.esta_aberta)
+
+wheel._mostrar_campo_filtro()
+evento_escape = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+wheel.keyPressEvent(evento_escape)
+checar("Escape com filtro aberto fecha só o filtro, não a roda inteira", not wheel._campo_filtro.isVisible() and wheel.esta_aberta)
+
 menu.fechar(imediato=True)
+menu.abrir()
+checar("Menu SAO não reabre enquanto a roda de ações está ativa", menu._estado == "closed")
+menu.fechar_tudo(imediato=True)
 
 for b in mascot_app.scheduler._behaviors:
     b.ultimo_disparo = 0.0

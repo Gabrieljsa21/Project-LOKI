@@ -1,0 +1,171 @@
+{
+  "quantidade_maxima": 5,
+  "acoes": [
+    {
+      "id": "flutuando_idle",
+      "pagina": 1
+    },
+    {
+      "id": "flutuando_para_sentada",
+      "pagina": 1
+    },
+    {
+      "id": "sentada_para_flutuando",
+      "pagina": 1
+    },
+    {
+      "id": "sentada_balancando-pernas",
+      "pagina": 1
+    },
+    {
+      "id": "sentada_pensando",
+      "pagina": 1
+    },
+    {
+      "id": "sentada_deitando",
+      "pagina": 2
+    },
+    {
+      "id": "sentada_caindo-no-sono",
+      "pagina": 2
+    },
+    {
+      "id": "sentada_espreguicando",
+      "pagina": 2
+    },
+    {
+      "id": "sentada_olhando-ao-redor",
+      "pagina": 2
+    },
+    {
+      "id": "sentada_acenando",
+      "pagina": 2
+    },
+    {
+      "id": "sentada_bocejando",
+      "pagina": 3
+    },
+    {
+      "id": "sentada_brincando-cabelo",
+      "pagina": 3
+    },
+    {
+      "id": "sentada_arrumando-cabelo",
+      "pagina": 3
+    },
+    {
+      "id": "sentada_enrolando-cabelo",
+      "pagina": 3
+    },
+    {
+      "id": "sentada_enrolando-cabelo_corando",
+      "pagina": 3
+    },
+    {
+      "id": "sentada_jogando-cabelo",
+      "pagina": 4
+    },
+    {
+      "id": "sentada_rindo",
+      "pagina": 4
+    },
+    {
+      "id": "sentada_risada-esnobe",
+      "pagina": 4
+    },
+    {
+      "id": "sentada_gargalhada_quase-caindo",
+      "pagina": 4
+    },
+    {
+      "id": "sentada_gargalhada_caindo",
+      "pagina": 4
+    },
+    {
+      "id": "sentada_segurando-riso",
+      "pagina": 5
+    },
+    {
+      "id": "sentada_rindo_sem-graca",
+      "pagina": 5
+    },
+    {
+      "id": "sentada_tehepero",
+      "pagina": 5
+    },
+    {
+      "id": "transformacao_inicio",
+      "pagina": 5
+    },
+    {
+      "id": "flutuando_para_brinde",
+      "pagina": 5
+    },
+    {
+      "id": "flutuando_para_leque",
+      "pagina": 6
+    },
+    {
+      "id": "flutuando_para_substituicao-ninja",
+      "pagina": 6
+    },
+    {
+      "id": "flutuando_para_trazendo-caos",
+      "pagina": 6
+    },
+    {
+      "id": "leque_ironica_loop",
+      "pagina": 6
+    },
+    {
+      "id": "leque_esnobe_loop",
+      "pagina": 6
+    },
+    {
+      "id": "leque_neutra_para_esnobe",
+      "pagina": 7
+    },
+    {
+      "id": "leque_sorriso_loop",
+      "pagina": 7
+    }
+  ],
+  "rotulos": {},
+  "simbolos": {},
+  "imagens": {
+    "flutuando_idle": "assets/gesture_wheel/icons/auto/flutuando_idle.png",
+    "flutuando_para_sentada": "assets/gesture_wheel/icons/auto/flutuando_para_sentada.png",
+    "sentada_para_flutuando": "assets/gesture_wheel/icons/auto/sentada_para_flutuando.png",
+    "sentada_balancando-pernas": "assets/gesture_wheel/icons/auto/sentada_balancando-pernas.png",
+    "sentada_pensando": "assets/gesture_wheel/icons/auto/sentada_pensando.png",
+    "sentada_deitando": "assets/gesture_wheel/icons/auto/sentada_deitando.png",
+    "sentada_caindo-no-sono": "assets/gesture_wheel/icons/auto/sentada_caindo-no-sono.png",
+    "sentada_espreguicando": "assets/gesture_wheel/icons/auto/sentada_espreguicando.png",
+    "sentada_olhando-ao-redor": "assets/gesture_wheel/icons/auto/sentada_olhando-ao-redor.png",
+    "sentada_acenando": "assets/gesture_wheel/icons/auto/sentada_acenando.png",
+    "sentada_bocejando": "assets/gesture_wheel/icons/auto/sentada_bocejando.png",
+    "sentada_brincando-cabelo": "assets/gesture_wheel/icons/auto/sentada_brincando-cabelo.png",
+    "sentada_arrumando-cabelo": "assets/gesture_wheel/icons/auto/sentada_arrumando-cabelo.png",
+    "sentada_enrolando-cabelo": "assets/gesture_wheel/icons/auto/sentada_enrolando-cabelo.png",
+    "sentada_enrolando-cabelo_corando": "assets/gesture_wheel/icons/auto/sentada_enrolando-cabelo_corando.png",
+    "sentada_jogando-cabelo": "assets/gesture_wheel/icons/auto/sentada_jogando-cabelo.png",
+    "sentada_rindo": "assets/gesture_wheel/icons/auto/sentada_rindo.png",
+    "sentada_risada-esnobe": "assets/gesture_wheel/icons/auto/sentada_risada-esnobe.png",
+    "sentada_gargalhada_quase-caindo": "assets/gesture_wheel/icons/auto/sentada_gargalhada_quase-caindo.png",
+    "sentada_gargalhada_caindo": "assets/gesture_wheel/icons/auto/sentada_gargalhada_caindo.png",
+    "sentada_segurando-riso": "assets/gesture_wheel/icons/auto/sentada_segurando-riso.png",
+    "sentada_rindo_sem-graca": "assets/gesture_wheel/icons/auto/sentada_rindo_sem-graca.png",
+    "sentada_tehepero": "assets/gesture_wheel/icons/auto/sentada_tehepero.png",
+    "flutuando_perdida": "assets/gesture_wheel/icons/auto/flutuando_perdida.png",
+    "transformacao_inicio": "assets/gesture_wheel/icons/auto/transformacao_inicio.png",
+    "flutuando_para_agarrada": "assets/gesture_wheel/icons/auto/flutuando_para_agarrada.png",
+    "flutuando_para_brinde": "assets/gesture_wheel/icons/auto/flutuando_para_brinde.png",
+    "flutuando_para_leque": "assets/gesture_wheel/icons/auto/flutuando_para_leque.png",
+    "flutuando_para_substituicao-ninja": "assets/gesture_wheel/icons/auto/flutuando_para_substituicao-ninja.png",
+    "flutuando_para_trazendo-caos": "assets/gesture_wheel/icons/auto/flutuando_para_trazendo-caos.png",
+    "leque_ironica_loop": "assets/gesture_wheel/icons/auto/leque_ironica_loop.png",
+    "leque_esnobe_loop": "assets/gesture_wheel/icons/auto/leque_esnobe_loop.png",
+    "leque_neutra_para_esnobe": "assets/gesture_wheel/icons/auto/leque_neutra_para_esnobe.png",
+    "leque_sorriso_loop": "assets/gesture_wheel/icons/auto/leque_sorriso_loop.png"
+  }
+}

@@ -17,12 +17,18 @@ conversa 2026-09-02 sobre as duas decisões que mudam comportamento global):
   propósito (chama a MESMA `alternar_visibilidade_solicitado`);
 - "Voz" chama `companion_panel.ciclar_modo_voz()` (mesmo ciclo do botão do
   painel, agora público) - nunca duplica estado de modo de voz próprio;
-- "Ações" e "GAIA" ficam clicáveis (fecham o menu) mas SEM conteúdo real
-  ainda - o próprio doc não define isso em detalhe suficiente pra
-  implementar ("Ações" é contextual/muda com o estado; "GAIA" concentraria
-  configurações/skins/etc., hoje já cobertas por outro caminho, o modal
-  `ui/qt_modais/mascot.py` do Painel principal) - decisão de conteúdo fica
-  pra quando houver escopo definido, não inventado aqui;
+- "Ações" abre a `GestureWheel`: um único nível de medalhões circulares no
+  estilo do menu de emotes de Don't Starve Together. Reaproveita a MESMA
+  fonte de transições válidas da bandeja e adapta a forma à tela (círculo,
+  meia-roda ou quadrante), sem mover a GAIA;
+- "Configurações" (renomeado em 2026-09-04) abre `modal_configuracoes.py`
+  DIRETO neste processo - o modal de configurações do LOKI é nativo daqui
+  desde que "o LOKI tem que conseguir se virar sozinho" virou requisito;
+  funciona em modo demonstração igual, sem precisar de bridge/GAIA
+  rodando. O botão "🧚 Mascot (LOKI)" do Painel da GAIA pede a MESMA
+  janela por um caminho diferente (evento `settings_requested`, já que ele
+  vive num processo separado e não pode instanciar um QWidget daqui
+  direto) - ver `_processar_evento_gaia` em `process_main.py`;
 - hover é um "hover-expand button" (pedido do usuário, 2026-09-02: "Oq eu
   queria era a ideia de hover-expand button") - o PRÓPRIO círculo anima a
   largura e vira uma pílula com ícone + texto ao passar o mouse, em vez de
@@ -46,11 +52,13 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
+from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 from mascot import companion_style as estilo
 from mascot import platform_windows
+from mascot.animacao_menu import preencher_menu_forcar_animacao
+from mascot.gesture_wheel import GestureWheel
 
 PASSO_MS = 16
 DURACAO_ITEM_MS = 220.0  # mesma ordem de grandeza do expandir/recolher do CompanionPanel (plano, seção 5.3: 160-220ms)
@@ -64,19 +72,17 @@ PADDING_PILULA_H = 14  # respiro do texto revelado dentro da pílula expandida
 FONTE_ROTULO_PT = 10.0  # MESMO valor usado pra medir a largura reservada (__init__) e pra desenhar (paintEvent) - nunca divergir, ver achado abaixo
 
 # (id, rótulo revelado ao expandir, glifo curto do círculo, desabilitado)
-# ordem = ordem de entrada. "Ações"/"GAIA" ficam DESABILITADAS (2026-09-02,
-# sugestão do GPT endossada pelo usuário: "eu mudaria o comportamento
-# provisório: enquanto os submenus não forem implementados, Ações e GAIA
-# deveriam aparecer desabilitados, em vez de aceitar clique e simplesmente
-# fechar o menu") - ainda revelam o rótulo no hover (o usuário vê o que
-# cada uma VAI fazer), mas não reagem a clique nem destacam cor no hover -
-# sinaliza "ainda não" em vez de parecer quebrado. Conteúdo real (menu
-# contextual de ações / controles da mascote) fica pra uma rodada própria.
+# ordem = ordem de entrada. Os 4 itens ganharam conteúdo real em 2026-09-03
+# (ver docstring do módulo) - "Ações"/"GAIA" ficaram DESABILITADOS entre
+# 2026-09-02 e 2026-09-03 (sugestão do GPT endossada pelo usuário: sinalizar
+# "ainda não" em vez de aceitar clique e só fechar o menu, enquanto o
+# conteúdo de cada um não estava definido) - `IDS_DESABILITADOS` continua
+# aqui pronto pra um item futuro precisar do mesmo tratamento.
 ITENS = (
     ("conversar", "Conversar", "💬", False),
     ("voz", "Voz", "🎤", False),
-    ("acoes", "Ações", "⚡", True),
-    ("gaia", "GAIA", "⚙️", True),
+    ("acoes", "Ações", "⚡", False),
+    ("gaia", "Configurações", "⚙️", False),
 )
 IDS_DESABILITADOS = frozenset(id_ for id_, _, _, desabilitado in ITENS if desabilitado)
 
@@ -316,11 +322,29 @@ class MenuSAO(QWidget):
     (doc, "Estados recomendados" - sem `submenu_open`, nenhum submenu
     implementado nesta versão)."""
 
-    def __init__(self, mascot_window, safety, companion_panel, estilo_id: str = ESTILO_PADRAO, parent=None):
+    def __init__(
+        self, mascot_window, safety, companion_panel, controller=None, mascot_app=None,
+        estilo_id: str = ESTILO_PADRAO, parent=None,
+    ):
         super().__init__(parent)
         self._mascot_window = mascot_window
         self._safety = safety
         self._companion_panel = companion_panel
+        # "Ações" (forçar animação, ver `_abrir_menu_forcar_animacao`) usa
+        # só `controller`. "Configurações" (`_abrir_configuracoes`) precisa da
+        # `MascotApp` inteira - `modal_configuracoes.ModalConfiguracoes`
+        # lê `.window`/`.config_mascot`/`.config_behaviors` dela.
+        self._controller = controller
+        self._mascot_app = mascot_app
+        # `scheduler` vem de `mascot_app` (já passado pra "Configurações",
+        # ver acima) - reaproveitado aqui pra `GestureWheel` conseguir
+        # chamar `BehaviorScheduler.forcar_movimento` de verdade (2026-09-04,
+        # achado ao vivo: "ao fazer movimentos como subida, ela n esta se
+        # movendo") em vez de só trocar o clipe.
+        scheduler = getattr(mascot_app, "scheduler", None)
+        self._gesture_wheel = (
+            GestureWheel(mascot_window, controller, safety, scheduler) if controller is not None else None
+        )
         self._estado = "closed"
         self.direcao = "right"
         self._tempo_inicio_animacao = 0.0
@@ -381,6 +405,8 @@ class MenuSAO(QWidget):
 
     # ------------------------------------------------------------------
     def abrir(self) -> None:
+        if self._gesture_wheel is not None and self._gesture_wheel.esta_aberta:
+            return
         if self._estado in ("opening", "open"):
             return
         if self._estado == "closing":
@@ -545,7 +571,67 @@ class MenuSAO(QWidget):
             self._companion_panel.alternar_visibilidade_solicitado.emit()
         elif id_ == "voz":
             self._companion_panel.ciclar_modo_voz()
+        elif id_ == "acoes":
+            self._abrir_gesture_wheel()
+        elif id_ == "gaia":
+            self._abrir_configuracoes()
         self.fechar()
+
+    def _construir_menu_forcar_animacao(self) -> QMenu | None:
+        """Monta o `QMenu` de "Ações" sem exibi-lo - separado de
+        `_abrir_menu_forcar_animacao` só pra dar pra inspecionar o
+        conteúdo (`.actions()`) num teste sem precisar mostrar/fechar um
+        popup de verdade. `None` se não há `controller` (menu construído
+        sem essa dependência, ex.: teste isolado de outra coisa).
+        `preencher_menu_forcar_animacao` (`mascot/animacao_menu.py`) é a
+        MESMA função que a bandeja usa pro submenu "Forçar animação"
+        (`process_main.py::_preencher_submenu_playground`) - extraída
+        2026-09-03 pra não duplicar o filtro de transições válidas."""
+        if self._controller is None:
+            return None
+        menu = QMenu(self)
+        preencher_menu_forcar_animacao(menu, self._controller)
+        return menu
+
+    def _abrir_menu_forcar_animacao(self) -> None:
+        """"Ações" (pedido do usuário, 2026-09-03: "deveria ser as
+        animações dela, a função forçar animação da bandeja") - MESMA
+        lógica de `process_main.py::_preencher_submenu_playground`: só
+        lista transições VÁLIDAS a partir do estado lógico atual, nunca o
+        catálogo inteiro (evita clicar um complemento fora de hora, mesmo
+        motivo de lá). Sem árvore de submenu própria do Menu SAO nesta
+        versão (doc, "árvore de submenu NÃO implementada") - um `QMenu`
+        nativo pop-up no cursor é o jeito mais direto de expor o mesmo
+        recurso aqui, sem inventar uma animação de submenu que ninguém
+        pediu ainda. `popup()` (não `exec()`) - não bloqueia esperando o
+        usuário escolher, mesmo espírito não-modal do resto do Menu SAO."""
+        menu = self._construir_menu_forcar_animacao()
+        if menu is not None:
+            menu.popup(QCursor.pos())
+
+    def _abrir_gesture_wheel(self) -> None:
+        """Abre a roda antes de o Menu SAO liberar seu bloqueio de autonomia."""
+        if self._gesture_wheel is not None:
+            self._gesture_wheel.abrir()
+
+    def fechar_tudo(self, imediato: bool = False) -> None:
+        """Fecha menu e roda; usado quando um arraste real começa."""
+        self.fechar(imediato=imediato)
+        if self._gesture_wheel is not None:
+            self._gesture_wheel.fechar()
+
+    def _abrir_configuracoes(self) -> None:
+        """"Configurações" (pedido do usuário, 2026-09-03, renomeado em 2026-09-04
+        depois do modal de configurações virar nativo do LOKI: "o ideal é
+        mantermos sempre o modal do loki atualizado. E a gaia ver meio q
+        ele") - delega pra `MascotApp._abrir_configuracoes` (instância
+        única e persistente, MESMO caminho da bandeja e do evento vindo da
+        GAIA) em vez de construir um modal próprio aqui - nunca duas
+        fontes de verdade pro mesmo modal. `None` só se `mascot_app` não
+        foi passado (ex.: teste isolado de outra coisa)."""
+        if self._mascot_app is None:
+            return
+        self._mascot_app._abrir_configuracoes()
 
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Escape:

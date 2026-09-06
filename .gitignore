@@ -16,6 +16,7 @@ dist/
 # Dados gerados em runtime (config/posição real do usuário - nunca commitado)
 data/mascot_config.json
 data/mascot_posicao.json
+data/mascot.log
 
 # Relatórios/cache gerados pelo pipeline de animações
 cache/

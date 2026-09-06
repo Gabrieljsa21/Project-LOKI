@@ -82,6 +82,7 @@ with tempfile.TemporaryDirectory() as temporary:
         tags=None,
         interruptible=None,
         dry_run=False,
+        reverse=False,
     )
     registered = automation.register([video], args)
     saved = automation.read_config(config_path)

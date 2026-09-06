@@ -10,26 +10,27 @@
   os scripts Python funcionam direto (`python scripts/automatizar_
   animacoes.py ...`), só falta o wrapper `.bat` de conveniência (mesmo
   padrão dos outros satélites, ver `Project-IRIS/iniciar_iris.bat`).
-- **Sem atalho de desktop / inicialização oculta** ainda (mesmo padrão de
-  `Project-IRIS/criar_atalho_desktop.vbs`/`iniciar_iris_oculto.vbs`) - não
-  é urgente porque a GAIA já sobe o processo sozinha via
-  `MascotSupervisor`; só faria diferença pra rodar 100% standalone sem a
-  GAIA no dia a dia.
 
-## Roadmap do plano original (`C:\Workspace\Project LOKI.md`)
+- **`always_on_top`/`pause_in_fullscreen` são config MORTA** (achado
+  2026-09-03, ao portar o modal de configurações pro LOKI) - `config.py::
+  MASCOT_PADRAO` declara os dois, mas nenhum lugar do código LÊ nenhum dos
+  dois (`deve_pausar_autonomia`, `platform_windows.py`, já pausa por conta
+  própria, sem checar `pause_in_fullscreen`; "sempre no topo" não tem
+  nenhum `WindowStaysOnTopHint` condicional em lugar nenhum). Removidos do
+  modal novo (`modal_configuracoes.py`) de propósito - manter um toggle
+  que não faz nada seria pior que não ter o toggle. Pré-existente, não
+  introduzido por esta mudança (o modal antigo da GAIA também os expunha
+  sem eles fazerem nada). Decisão pendente: implementar de verdade ou
+  remover as chaves de `MASCOT_PADRAO`.
+
+## Roadmap original (fases 6-8, ver `ARQUITETURA.md`)
 
 - **Fase 6** - novos Behaviors: Cursor Swing e Cursor Hunt (hoje
   desligados por padrão, "precisam de clipes próprios, ainda sem
-  cobertura" - ver `ui/qt_modais/mascot.py` da GAIA).
+  cobertura" - ver `mascot/modal_configuracoes.py::BEHAVIORS_LABELS`).
 - **Fase 7** - Tug of War (cabo de guerra puxando o cursor) - opcional,
   desligado por padrão, hook de mouse por até 3s.
 - **Fase 8** - cutover definitivo do Live2D/VTube Studio (remover
   `features/avatar_overlay/` da GAIA, PyQt5/OpenCV/websocket-client como
   dependências órfãs) - ainda não decidido, os dois convivem por
   enquanto.
-- **Ações/GAIA (Menu SAO)** - os dois círculos desabilitados
-  ("Ações"/"GAIA") ainda não têm conteúdo real: "Ações" seria o menu
-  contextual reaproveitando `state_catalog.transicoes_validas_a_partir_
-  de`, "GAIA" seria controles diretos da mascote (escala, opacidade,
-  autonomia) sem precisar abrir o Painel da GAIA. Deferido de propósito
-  pra uma rodada própria (não é uma correção pequena).

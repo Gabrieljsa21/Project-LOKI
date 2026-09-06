@@ -7,6 +7,7 @@ da mesma categoria (por exemplo, ``flutuando_superior-esquerda_iniciar``).
 from __future__ import annotations
 
 import json
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -68,17 +69,26 @@ CATALOGO: dict[str, EstadoAnimacao] = {
         "sentada_pensando", loop=True, origem="sentada", destino="sentada",
         fallback=None, interrompivel=True, tags=("idle", "thinking"),
     ),
+    # 2026-09-06, achado ao vivo pelo usuário: "A animação do caindo de
+    # sono e deitando tao com os finais trocados" - os destinos das duas
+    # estavam invertidos (o clipe de "caindo no sono" terminava marcado
+    # como "dormindo" quando a pose final de verdade é a exausta/deitada,
+    # e vice-versa). Corrigido trocando só o `destino` das duas - o resto
+    # do grafo (`dormindo_trocando-lado`/`dormindo_para_exausta`/
+    # `dormindo_para_sentada`/`exausta_para_sentada`) já era definido só
+    # em termos dos NOMES de estado "dormindo"/"deitada", então continua
+    # correto sem tocar em nada além daqui.
     "sentada_deitando": _estado(
-        "sentada_deitando", loop=False, origem="sentada", destino="deitada",
+        "sentada_deitando", loop=False, origem="sentada", destino="dormindo",
         fallback=None, interrompivel=False, tags=("transition", "sleep", "terminal-pose"),
     ),
     "sentada_caindo-no-sono": _estado(
-        "sentada_caindo-no-sono", loop=False, origem="sentada", destino="dormindo",
+        "sentada_caindo-no-sono", loop=False, origem="sentada", destino="deitada",
         fallback=None, interrompivel=False, tags=("transition", "sleep", "terminal-pose"),
     ),
     "dormindo_trocando-lado": _estado(
-        "dormindo_trocando-lado", loop=False, origem="dormindo", destino="dormindo",
-        fallback=None, interrompivel=False, tags=("action", "sleep", "terminal-pose"),
+        "dormindo_trocando-lado", loop=False, origem="deitada", destino="dormindo",
+        fallback=None, interrompivel=False, tags=("transition", "sleep", "terminal-pose"),
     ),
 }
 
@@ -180,7 +190,7 @@ for animation_id, origem, destino, fallback, tags in (
 
 # Fluxo de arraste: o estado lógico "agarrada" representa a Galateia
 # suspensa pelo cursor. As reações são loops intercambiáveis; ao soltá-la,
-# uma das duas quedas toca e encadeia automaticamente a recuperação até o
+# uma das quedas toca e encadeia automaticamente a recuperação até o
 # idle flutuando.
 CATALOGO["flutuando_para_agarrada"] = _estado(
     "flutuando_para_agarrada", loop=False, origem="flutuando", destino="agarrada",
@@ -300,3 +310,51 @@ def obter(animation_id: str) -> EstadoAnimacao:
 
 def transicoes_validas_a_partir_de(estado: str | None) -> tuple[EstadoAnimacao, ...]:
     return tuple(e for e in CATALOGO.values() if e.estado_origem == estado)
+
+
+def caminho_para_estado(origem: str | None, destino: str | None) -> tuple[str, ...] | None:
+    """BFS sobre o grafo de transições (cada entrada do catálogo é uma
+    aresta `estado_origem -> estado_destino`) - devolve a sequência de ids
+    (uma transição por "salto" real de estado) que leva de `origem` até
+    `destino`, ou `None` se não existir caminho. Tupla vazia se já estiver
+    lá. Usado pra "preparar" a Galateia num estado específico antes de
+    disparar uma ação que exige aquele estado de origem (2026-09-05,
+    pedido do usuário: a Gesture Wheel/editor listam TODAS as animações,
+    não só as alcançáveis do estado atual - "eu posso querer q ela faça a
+    transformação msm estando sentada, é só ela fazer a animação de
+    levantar e ir p idle") - cada salto encadeado dispara só a transição
+    de FRONTEIRA; o fallback declarativo de cada uma (já existente) cuida
+    de chegar no idle daquele estado sozinho, sem precisar listar aqui
+    cada etapa intermediária do fallback."""
+    if origem == destino:
+        return ()
+    visitados = {origem}
+    fila = deque(((origem, ()),))
+    while fila:
+        atual, caminho = fila.popleft()
+        for entrada in CATALOGO.values():
+            if entrada.estado_origem != atual or entrada.estado_destino in visitados:
+                continue
+            novo_caminho = caminho + (entrada.id,)
+            if entrada.estado_destino == destino:
+                return novo_caminho
+            visitados.add(entrada.estado_destino)
+            fila.append((entrada.estado_destino, novo_caminho))
+    return None
+
+
+# Fora de qualquer seleção MANUAL de propósito (2026-09-04, pedido do
+# usuário: "pode remover a animação Perdida e Abrindo a Cortina" ->
+# reforçado 2026-09-05, depois de aparecerem no log de pré-carregamento
+# especulativo mesmo escondidas da roda: "essa cortina abrindo pode
+# remover, e a perdida tbm") - continuam existindo no catálogo de verdade
+# (`flutuando_cortina-abrindo` é a cena-ampla usada como fixture nos
+# testes de resize - `testar_mascot_assets.py`/`testar_mascot_behaviors.
+# py` - e `AnimationController.solicitar_transicao` continua aceitando as
+# duas se pedidas diretamente), só param de ser OFERECIDAS: na Gesture
+# Wheel/editor (`gesture_wheel.py`), no menu "Forçar animação" da bandeja/
+# Menu SAO (`animacao_menu.py`) e no pré-carregamento especulativo de
+# "prováveis próximos" (`AnimationController._computar_protegidos_e_
+# candidatos_preload`) - fonte única aqui pra não duplicar a mesma lista
+# nos 3 consumidores.
+IDS_OCULTOS_DE_SELECAO = frozenset({"flutuando_perdida", "flutuando_cortina-abrindo"})

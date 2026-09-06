@@ -53,12 +53,32 @@ class AnimationController(QObject):
         self._estado_logico: str | None = None
         self._ultimo_loop_id: str | None = None
         self._id_solicitado_mais_recente: str | None = None
+        self._fila_preparo: list[str] = []
+        self._estado_alvo_preparo: str | None = None
+        self._acao_preparo_concluido = None
+        self._tentativas_preparo_restantes = 0
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._avancar)
 
-        self._repositorio.definir_pinados(self._computar_pinados())
+        pinados = self._computar_pinados()
+        self._repositorio.definir_pinados(pinados)
         self.iniciar(state_catalog.ANIMACAO_INICIAL)
+        # Esquenta o cache pra TODO o conjunto pinado já na largada, não só
+        # pra quem é candidato de preload a 1 salto do idle inicial (`_computar_
+        # protegidos_e_candidatos_preload`, chamado por `iniciar` acima -
+        # cobre as 8 direções/agarrar/sentar/leque, mas NUNCA os loops de
+        # repouso de "sentada"/"leque", só alcançáveis DEPOIS de já estar
+        # nesses estados, 2 saltos de distância do idle). Sem isso, mesmo
+        # pinado, esses 5 loops só carregavam (e travavam, uma vez) na
+        # PRIMEIRA vez que fossem usados de verdade - `prioridade=False`
+        # (mesmo semáforo do preload especulativo) pra nunca competir com o
+        # carregamento de algo pedido de verdade; ids já cobertos pelo
+        # preload de `iniciar()` ou já em cache (`flutuando_idle`, carregado
+        # síncrono acima) só recebem um pedido redundante, sem custo real
+        # (`garantir_carregado_assincrono` já deduplica).
+        for animation_id in pinados:
+            self._repositorio.garantir_carregado_assincrono(animation_id, lambda _asset: None, prioridade=False)
 
     def _computar_pinados(self) -> frozenset[str]:
         """Conjunto PERMANENTE de clipes de entrada de movimento/arraste a
@@ -67,24 +87,45 @@ class AnimationController(QObject):
         fluxo carregar). Filtra pela tag `"transition"` que o grafo já usa
         (`state_catalog.py`) em vez de listar ids à mão - pega os 8
         `_iniciar` de direção + `flutuando_para_agarrada` +
-        `flutuando_para_sentada` (todos tagueados "transition") e exclui de
-        propósito as ações/cenas raras a partir do idle (`flutuando_perdida`,
-        `flutuando_cortina-abrindo`, `transformacao_inicio` - tagueadas
-        "action", nunca "transition") - essas não valem o RAM permanente,
-        são raras e já se beneficiam do pré-carregamento especulativo
-        transiente de qualquer forma (`_computar_protegidos_e_candidatos_preload`)."""
+        `flutuando_para_sentada` + `flutuando_para_leque` (todos tagueados
+        "transition") e exclui de propósito as ações/cenas raras a partir
+        do idle (`flutuando_perdida`, `flutuando_cortina-abrindo`,
+        `transformacao_inicio` - tagueadas "action", nunca "transition") -
+        essas não valem o RAM permanente, são raras e já se beneficiam do
+        pré-carregamento especulativo transiente de qualquer forma
+        (`_computar_protegidos_e_candidatos_preload`).
+
+        **Loops de repouso também pinados (2026-09-04, achado ao vivo:
+        "ela trava ate p sentar. E no inicio do projeto... ela rodava
+        lisa")** - só a TRANSIÇÃO de entrada (ex.: `flutuando_para_sentada`)
+        estava pinada; o loop que toca DEPOIS dela ao chegar no repouso
+        (`sentada_balancando-pernas`/`sentada_pensando`, e as 3 variantes de
+        `leque`) não estava, então cada vez que esse loop não sobrevivia ao
+        orçamento (`AssetRepository`, corrigido 2026-09-01 - antes disso
+        tudo ficava em cache sem despejo, daí "rodava lisa"), a transição
+        terminava lisa e a MESMA travada batia um instante depois, ao
+        entrar no loop. `"idle"` é a MESMA tag que `gesture_wheel.py::
+        ESTADOS_ESTAVEIS` já usa pros 3 estados de repouso (flutuando/
+        sentada/leque) - só 6 clipes no catálogo INTEIRO têm essa tag, ~204MB
+        a mais de RAM permanente (medido), um custo pequeno e previsível
+        pra nunca mais travar num repouso normal - as cenas/ações raras
+        continuam de fora, só carregam sob demanda como antes."""
         entrada_inicial = state_catalog.CATALOGO[state_catalog.ANIMACAO_INICIAL]
         candidatos = state_catalog.transicoes_validas_a_partir_de(entrada_inicial.estado_destino)
         # Nem toda transição nova a partir do idle merece ficar residente. As
-        # cinematográficas (leque, brinde, ninja, Chaos...) são carregadas sob
-        # demanda; só os fluxos interativos imediatos de movimento, arraste e
-        # sentar entram no conjunto permanente de cold-start.
-        categorias_imediatas = {"movement", "drag", "sitting"}
-        return frozenset(
+        # cinematográficas (brinde, ninja, Chaos...) são carregadas sob
+        # demanda; só os fluxos interativos imediatos de movimento, arraste,
+        # sentar e leque entram no conjunto permanente de cold-start.
+        categorias_imediatas = {"movement", "drag", "sitting", "fan"}
+        transicoes_imediatas = frozenset(
             e.id
             for e in candidatos
             if "transition" in e.tags and categorias_imediatas.intersection(e.tags)
         )
+        loops_de_repouso = frozenset(
+            e.id for e in state_catalog.CATALOGO.values() if "idle" in e.tags
+        )
+        return transicoes_imediatas | loops_de_repouso
 
     @property
     def animacao_atual(self) -> str | None:
@@ -127,15 +168,12 @@ class AnimationController(QObject):
         self._carregar_e_tocar_sincrono(animation_id)
 
     def forcar_estado(self, animation_id: str) -> None:
-        """Escape hatch pro runtime (não só a entrada, como `iniciar`) pra
-        estados SEM NENHUMA transição de volta no grafo - ex.: acordar do
-        sono (pedido do usuário, 2026-08-29: "reconhecer AFK pra por a
-        GAIA pra dormir"), onde não existe arte de "acordando" ainda,
-        então não tem clipe pra tocar entre "dormindo" e o idle normal.
-        Pula a validação do grafo de propósito - usar só quando a arte
-        certa pra uma transição de verdade não existe; prefira sempre
-        `solicitar_transicao` quando ela existir. SÍNCRONO (evento raro,
-        não é o caminho comum de transição do dia a dia) - ver `iniciar`."""
+        """Escape hatch que pula a validação do grafo de propósito.
+
+        Use apenas quando não existe uma transição visual compatível; estados
+        terminais com arte de saída devem usar `solicitar_transicao`. É síncrono
+        porque atende eventos raros, não o caminho comum do runtime.
+        """
         self._carregar_e_tocar_sincrono(animation_id)
 
     def solicitar_transicao(self, animation_id: str) -> bool:
@@ -144,7 +182,19 @@ class AnimationController(QObject):
             logger.warning("Mascot: animação desconhecida no catálogo: %s", animation_id)
             return False
 
-        if self._entrada is not None and not self._entrada.loop and not self._entrada.interrompivel:
+        clipe_terminal_concluido = (
+            self._entrada is not None
+            and self._asset is not None
+            and not self._timer.isActive()
+            and self._indice_quadro == self._asset.frame_count - 1
+            and self._id_solicitado_mais_recente == self._entrada.id
+        )
+        if (
+            self._entrada is not None
+            and not self._entrada.loop
+            and not self._entrada.interrompivel
+            and not clipe_terminal_concluido
+        ):
             logger.info("Mascot: transição pra %s rejeitada, %s não é interrompível", animation_id, self._entrada.id)
             return False
 
@@ -158,6 +208,85 @@ class AnimationController(QObject):
 
         self._carregar_e_tocar(animation_id)
         return True
+
+    def preparar_para(self, estado_alvo: str | None, ao_chegar) -> bool:
+        """Navega sozinha até `estado_alvo` (`state_catalog.
+        caminho_para_estado`) e só então chama `ao_chegar()` - callback
+        genérico (2026-09-05), permite compor com ações que não são um
+        `solicitar_transicao` simples (ex.: `BehaviorScheduler.
+        forcar_sentar`/`forcar_movimento`, que exigem o estado "flutuando"
+        de verdade antes de rodar a física deles, não só o clipe).
+        `solicitar_transicao_com_preparo` é o caso comum (`ao_chegar` =
+        pedir a própria animação).
+
+        `False` se não houver caminho nenhum até `estado_alvo` (ex.: presa
+        numa cena não-interrompível) - `ao_chegar` nunca roda nesse caso."""
+        if estado_alvo == self._estado_logico:
+            ao_chegar()
+            return True
+        caminho = state_catalog.caminho_para_estado(self._estado_logico, estado_alvo)
+        if not caminho:
+            logger.info("Mascot: sem caminho de %s até %s", self._estado_logico, estado_alvo)
+            return False
+        self._fila_preparo = list(caminho)
+        self._estado_alvo_preparo = estado_alvo
+        self._acao_preparo_concluido = ao_chegar
+        self._tentativas_preparo_restantes = len(caminho) + 3  # folga p/ fallback com mais de 1 elo
+        return self._avancar_fila_preparo()
+
+    def solicitar_transicao_com_preparo(self, animation_id: str) -> bool:
+        """Igual `solicitar_transicao`, mas quando `animation_id` exige um
+        `estado_origem` diferente do atual, primeiro navega até lá sozinha
+        (`preparar_para`) - 2026-09-05, pedido do usuário: a Gesture
+        Wheel/editor listam TODAS as animações escolhíveis, não só as
+        alcançáveis do estado atual ("eu posso querer q ela faça a
+        transformação msm estando sentada, é só ela fazer a animação de
+        levantar e ir p idle, q é o necessario p iniciar a transformação").
+
+        `False` se `animation_id` for desconhecido ou sem caminho até lá -
+        mesmo contrato de retorno de `solicitar_transicao`."""
+        entrada_pedida = state_catalog.CATALOGO.get(animation_id)
+        if entrada_pedida is None:
+            logger.warning("Mascot: animação desconhecida no catálogo: %s", animation_id)
+            return False
+        return self.preparar_para(entrada_pedida.estado_origem, lambda: self.solicitar_transicao(animation_id))
+
+    def _avancar_fila_preparo(self) -> bool:
+        proximo = self._fila_preparo.pop(0)
+        # Conecta ANTES de pedir - se o asset já estiver em cache,
+        # `estado_alterado` pode disparar de forma SÍNCRONA dentro da
+        # própria chamada de `solicitar_transicao` (mesma pilha); conectar
+        # depois perderia esse disparo e travaria esperando pra sempre.
+        self.estado_alterado.connect(self._ao_avancar_preparo)
+        if not self.solicitar_transicao(proximo):
+            self.estado_alterado.disconnect(self._ao_avancar_preparo)
+            self._fila_preparo = []
+            self._acao_preparo_concluido = None
+            return False
+        return True
+
+    def _ao_avancar_preparo(self, estado: str) -> None:
+        alvo_esperado = (
+            state_catalog.CATALOGO[self._fila_preparo[0]].estado_origem
+            if self._fila_preparo else self._estado_alvo_preparo
+        )
+        if estado == alvo_esperado:
+            self.estado_alterado.disconnect(self._ao_avancar_preparo)
+            if self._fila_preparo:
+                self._avancar_fila_preparo()
+            else:
+                acao = self._acao_preparo_concluido
+                self._acao_preparo_concluido = None
+                acao()
+            return
+        self._tentativas_preparo_restantes -= 1
+        if self._tentativas_preparo_restantes <= 0:
+            # algo desviou o caminho (arraste real, outra ação manual) -
+            # abandona em vez de ficar escutando pra sempre um estado que
+            # talvez nunca mais bata.
+            self._fila_preparo = []
+            self._acao_preparo_concluido = None
+            self.estado_alterado.disconnect(self._ao_avancar_preparo)
 
     def parar(self) -> None:
         self._timer.stop()
@@ -193,6 +322,15 @@ class AnimationController(QObject):
         pra sempre enquanto parada."""
         entrada_pedida = state_catalog.CATALOGO.get(animation_id)
         candidatos = state_catalog.transicoes_validas_a_partir_de(entrada_pedida.estado_destino) if entrada_pedida else ()
+        # `IDS_OCULTOS_DE_SELECAO` fora do preload especulativo também
+        # (2026-09-05) - "Perdida"/"Abrindo a Cortina" não são oferecidas
+        # em nenhum menu, então esquentar o cache delas em segundo plano
+        # toda vez que ela chega em "flutuando" só gera trabalho (e log)
+        # à toa; `animation_id` pedido DIRETO continua funcionando
+        # normalmente (ex.: os testes que usam `flutuando_cortina-abrindo`
+        # como fixture de cena ampla), essa exclusão só tira as duas da
+        # lista de "prováveis próximos".
+        candidatos = tuple(c for c in candidatos if c.id not in state_catalog.IDS_OCULTOS_DE_SELECAO)
         protegidos = {animation_id} | {e.id for e in candidatos if "transition" in e.tags}
         return protegidos, candidatos
 
@@ -320,11 +458,26 @@ class AnimationController(QObject):
             # `_carregar_e_tocar` nenhum depois daqui, então precisa
             # atualizar/emitir `estado_logico` direto (único caso deste
             # método que faz isso - ver nota abaixo sobre reentrância).
+            #
+            # 🔥 CORRIGIDO (2026-09-06, achado ao vivo implementando o
+            # sorteio de humor do "leque" - "o ficar esnobe parece q esta
+            # sem o final tbm") - `estado_alterado.emit()` disparava ANTES
+            # de `_indice_quadro`/`_timer.stop()` - um listener SÍNCRONO
+            # (`MascotWindow._ao_estado_alterado`, mesmo padrão já usado
+            # por "agarrada") que reagisse a esse evento pedindo uma NOVA
+            # transição na hora era REJEITADO por engano:
+            # `clipe_terminal_concluido` (`solicitar_transicao`) exige
+            # `not self._timer.isActive()`, que ainda seria True nesse
+            # instante. "Agarrada" nunca sofria disso porque seu fallback
+            # é FIXO (troca de asset antes do emit, no outro branch) - só
+            # poses SEM fallback (como "leque" agora) hitavam essa ordem
+            # errada. Setar tudo ANTES do emit deixa `clipe_terminal_
+            # concluido` já bater na hora que o listener síncrono reage.
             self._estado_logico = destino
-            self.estado_alterado.emit(self._estado_logico or "")
             self._indice_quadro = self._asset.frame_count - 1
             self._timer.stop()
             self.quadro_alterado.emit()
+            self.estado_alterado.emit(self._estado_logico or "")
             return
         # `estado_logico` só é atualizado (e `estado_alterado` só emitido)
         # DENTRO de `_carregar_e_tocar`, nunca antes de chamá-lo - emitir

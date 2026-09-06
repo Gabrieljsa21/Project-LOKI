@@ -145,6 +145,8 @@ def load_and_clean(
     frames = [frame for _, segment_frames in loaded for frame in segment_frames]
     frames = trim_frames(frames, item)
     frames = restore_canvas(frames, item.get("restoreCanvas"))
+    if bool(item.get("reverse", False)):
+        frames.reverse()
     single.validate_equal_canvas(frames)
 
     background = str(item.get("background", "auto"))

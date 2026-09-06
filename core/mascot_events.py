@@ -9,7 +9,9 @@ subprocesso) e `integrations/mascot/bridge_client.py` (lado GAIA).
 Só tem construtor/validação pros eventos que já têm consumidor real hoje
 (handshake, `ready`, `heartbeat`, `state_changed`, `shutdown`, e desde o
 CompanionPanel MVP 2026-09-01: `chat_submitted`, `stop_speaking_requested`,
-`voice_toggle_requested`, `assistant_message`) - o resto da tabela do plano
+`voice_toggle_requested`, `assistant_message`; desde 2026-09-03:
+`settings_requested`, pro modal de configurações nativo do Mascot) - o
+resto da tabela do plano
 (seção 8.2/8.3: `user_message` ecoado de outros canais, `emotion_changed`
 separado, `playback_started`/`audio_level`/`playback_finished`, `caption`,
 `notice`, `mascot_clicked`) segue sem construtor de propósito, mesmo
@@ -103,6 +105,16 @@ def evento_voice_toggle_requested(desired_state) -> dict:
     if desired_state not in VOZES_MODOS_VALIDOS:
         raise EventoInvalido(f"modo de voz desconhecido: {desired_state}")
     return {"type": "voice_toggle_requested", "desired_state": desired_state}
+
+
+def evento_settings_requested() -> dict:
+    """GAIA -> Mascot (botão "🧚 Mascot (LOKI)" do Painel, 2026-09-03,
+    revisado no mesmo dia) - pede pro Mascot mostrar o PRÓPRIO modal
+    nativo de configurações (`mascot/modal_configuracoes.py`, Project
+    LOKI - fonte única desde que ele passou a rodar dentro do processo do
+    Mascot). A GAIA não pode instanciar esse QWidget direto (processo
+    separado), só pedir que o outro lado mostre o dele. Sem payload."""
+    return {"type": "settings_requested"}
 
 
 def evento_user_message(id: str, text: str, channel: str = "voz") -> dict:
