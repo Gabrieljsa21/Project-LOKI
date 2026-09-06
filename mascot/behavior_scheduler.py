@@ -11,14 +11,11 @@ Wander (as 8 direções de flutuar importadas em 2026-08-28 - toggle
 `wander`, que o plano já previa e vem `false` por padrão até ser validado
 ao vivo).
 
-A sequência de sono (`sentada_caindo-no-sono`/`sentada_deitando`) fica DE
-FORA do sorteio autônomo de propósito (2026-08-28) - ela é
-fisiológica/temporal (só faz sentido depender de hora do dia/tempo
-ocioso real), não um tique aleatório como espreguiçar ou rir. Sem um
-gatilho de tempo real ainda (isso é Fase 3, junto com o resto do
-contexto vindo da GAIA), sortear ela junto das reações faria a
-personagem "ter sono" as 14h só porque o RNG quis - só fica acessível
-pelo playground até existir esse gatilho de verdade.
+A sequência de sono (`sentada_caindo-no-sono`/`sentada_deitando`) fica fora
+do sorteio comum: ela depende da ociosidade real. Enquanto o usuário permanece
+AFK, a Galateia nunca volta a sentar; alterna, com intervalo, entre as poses
+`dormindo` e `deitada` por transições visuais próprias. Ao detectar o retorno,
+usa `dormindo_para_sentada` ou `exausta_para_sentada`, conforme a pose atual.
 
 Cada Behavior declara peso, cooldown, orçamento por hora e os assets que
 exige - "o scheduler nunca seleciona um Behavior sem todos os assets
@@ -28,20 +25,24 @@ fallback.
 """
 from __future__ import annotations
 
+import logging
 import math
 import random
 import time
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
 from mascot import platform_windows, state_catalog
 from mascot.animation_controller import AnimationController
-from mascot.asset_repository import AssetRepository
+from mascot.asset_repository import AnimationAsset, AssetRepository
 from mascot.physics import MovimentoAmortecido, MovimentoComDuracaoFixa
 from mascot.safety import SafetyController
 from mascot.window import MascotWindow
+
+logger = logging.getLogger(__name__)
 
 INTERVALO_TICK_MS = 3000
 TIMEOUT_OCUPADO_SEGUNDOS = 60  # trava de segurança - nenhuma ação legítima (fila de saltos + queda + recuperação, o pior caso real) passa disso; se passar, algum callback de transição não disparou (bug real, 2026-08-29: "ja tem mais de 10min q ela ta em idle flutuando" sem tela cheia/RDP/trava de tela) e `_ocupado` ficava preso pra sempre, sem isso, até reiniciar o processo do zero
@@ -53,10 +54,7 @@ MAX_SALTOS_DESTINO = 8  # trava de segurança - nunca persegue um destino pra se
 DISTANCIA_POR_CICLO_LOOP_PX = 350  # quanto cada repetição do loop "deveria" cobrir - decide quantos ciclos tocar antes de frear
 CICLOS_LOOP_MINIMO = 1  # nunca corta o loop antes de completar pelo menos 1 volta inteira (bug real, 2026-08-29: "faz iniciar->loop->pausa, em vez de repetir o loop")
 MARGEM_COSSENO_DIRECAO = 0.06  # ~14-20° de tolerância - direções quase tão alinhadas quanto a melhor entram no sorteio (ver _direcao_mais_proxima)
-# reações sentada->sentada já existentes que COMBINAM com "acabou de
-# acordar" - reaproveitadas por `_acordar` pra disfarçar o salto de
-# estado sem arte de "acordando" (ver _acordar).
-REACOES_ACORDAR = ("sentada_espreguicando", "sentada_bocejando")
+INTERVALO_VARIACAO_SONO_SEGUNDOS = (90.0, 240.0)
 
 DIRECOES_VETOR = {
     "direita": (1.0, 0.0),
@@ -154,6 +152,7 @@ class BehaviorScheduler(QObject):
         self._ocupado_desde: float | None = None  # timestamp de quando ficou ocupada - alimenta o watchdog de TIMEOUT_OCUPADO_SEGUNDOS em _tick
         self._callback_estado_pendente: Callable[[str], None] | None = None  # qual callback está esperando o próximo estado_alterado agora (nunca mais de um por vez, _ocupado impede re-entrada) - evita warning do Qt ao desconectar um slot que não estava conectado (ver interromper_para_arraste)
         self._ultimo_disparo_por_familia: dict[str, float] = {}
+        self._proxima_variacao_sono_em: float | None = None
         self._movimento = MovimentoAmortecido(rigidez=25.0, amortecimento=9.0, parent=self)
         self._movimento_wander = MovimentoComDuracaoFixa(parent=self)
         self._destino_ativo: tuple[float, float] | None = None
@@ -203,7 +202,7 @@ class BehaviorScheduler(QObject):
         # elegível (ou ficasse elegível) enquanto bloqueado, ele dispararia
         # QUASE NA HORA em que o bloqueio caísse (ex.: fechar o menu SAO e
         # ela sair voando na mesma hora) - comportamento estranho descrito
-        # em `Project LOKI.md`/`GAIA_MENU_SAO.md`. `ultimo_disparo = agora`
+        # em `GAIA_MENU_SAO.md`. `ultimo_disparo = agora`
         # direto (NUNCA `marcar_disparo`, que também contaria pro orçamento
         # por hora - `Behavior.elegivel`, `disparos_na_janela` - um reinício
         # de cooldown não é um disparo de verdade).
@@ -283,15 +282,25 @@ class BehaviorScheduler(QObject):
         afk = segundos_ociosos >= self._config.get("afk_minutos", 10) * 60
         if dormindo:
             if not afk:
-                self._acordar()
+                if not self._ocupado:
+                    self._acordar()
+                self._proxima_variacao_sono_em = None
+            elif not self._ocupado:
+                agora = time.monotonic()
+                if self._proxima_variacao_sono_em is None:
+                    self._agendar_proxima_variacao_sono(agora)
+                elif agora >= self._proxima_variacao_sono_em:
+                    self._variar_sono()
             return
+        self._proxima_variacao_sono_em = None
         if afk and not (self._config.get("reduce_motion") or self._config.get("autonomy") == "parada") and self._safety.autonomia_permitida:
             self._iniciar_sono()
 
     def _iniciar_sono(self) -> None:
         if self._controller.animacao_atual == "sentada_balancando-pernas":
             self._ocupado = True
-            if not self._controller.solicitar_transicao("sentada_caindo-no-sono"):
+            transicao = random.choice(("sentada_caindo-no-sono", "sentada_deitando"))
+            if not self._controller.solicitar_transicao(transicao):
                 self._ocupado = False
                 return
             self._conectar_liberar_ocupado()
@@ -302,20 +311,37 @@ class BehaviorScheduler(QObject):
             # tick (3s) e ela cai no sono assim que estiver sentada.
             self._executar_taskbar_sit()
 
-    def _acordar(self) -> None:
-        # sem arte de "acordando" ainda (ver docstring de
-        # `AnimationController.forcar_estado`) - o salto de estado em si
-        # (dormindo/deitada -> sentada) é instantâneo por dentro, mas
-        # NUNCA chega a ser desenhado: a ação real (espreguiçar/bocejar,
-        # ambas já existem e combinam com "acabou de acordar") entra no
-        # lugar na mesma chamada síncrona, antes de qualquer quadro
-        # renderizar - pra quem está olhando, ela pula do sono direto pra
-        # uma reação animada de acordar, nunca pro idle parado seco
-        # (pedido do usuário, 2026-08-29: "tem de ter uma transição
-        # suave entre animações").
-        self._controller.forcar_estado("sentada_balancando-pernas")
+    def _agendar_proxima_variacao_sono(self, agora: float | None = None) -> None:
+        minimo, maximo = INTERVALO_VARIACAO_SONO_SEGUNDOS
+        inicio = agora if agora is not None else time.monotonic()
+        self._proxima_variacao_sono_em = inicio + random.uniform(minimo, maximo)
+
+    def _variar_sono(self) -> None:
+        transicao = {
+            "deitada": "dormindo_trocando-lado",
+            "dormindo": "dormindo_para_exausta",
+        }.get(self._controller.estado_logico)
+        self._agendar_proxima_variacao_sono()
+        if transicao is None:
+            return
         self._ocupado = True
-        if not self._controller.solicitar_transicao(random.choice(REACOES_ACORDAR)):
+        if not self._controller.solicitar_transicao(transicao):
+            self._ocupado = False
+            return
+        self._conectar_liberar_ocupado()
+
+    def _acordar(self) -> None:
+        # Cada pose terminal agora tem sua transição visual própria de volta
+        # ao estado sentada; não é mais necessário esconder um salto de estado
+        # com uma ação genérica de bocejo/espreguiçada.
+        transicao = {
+            "dormindo": "dormindo_para_sentada",
+            "deitada": "exausta_para_sentada",
+        }.get(self._controller.estado_logico)
+        if transicao is None:
+            return
+        self._ocupado = True
+        if not self._controller.solicitar_transicao(transicao):
             self._ocupado = False
             return
         self._conectar_liberar_ocupado()
@@ -484,14 +510,31 @@ class BehaviorScheduler(QObject):
                 (x_alvo, y_alvo),
             )
 
+    @cached_property
+    def _ids_existentes(self) -> frozenset[str]:
+        """Existência de asset é FIXA pra vida do processo (pastas não
+        aparecem/somem em runtime) - cacheado depois da 1ª leitura."""
+        return frozenset(self._repositorio.ids_disponiveis())
+
     def _direcoes_disponiveis(self) -> list[str]:
+        """Direções cujos 3 clipes (`iniciar`/`loop`/`parar`) existem de
+        verdade como asset - checagem de EXISTÊNCIA (via `ids_disponiveis()`,
+        só lista pastas com `animation.json`, I/O leve sem decodificar
+        nada), não de cache. Antes usava `AssetRepository.obter()` pra
+        isso, que força carga SÍNCRONA real de qualquer clipe ainda não
+        cacheado (200-300ms cada, até 24 chamadas por decisão - `_loop`/
+        `_parar` nunca ficam pinados, então qualquer direção não usada há
+        um tempo travava de novo) - travava tanto o Wander quanto "ir até
+        o destino" (2026-09-05, achado ao vivo: "ela acabou de lagar p
+        descer... tbm na parte de ir até onde o mouse tá" - watchdog
+        chegou a registrar 4750ms de travada numa única checagem). O
+        carregamento de verdade continua por conta de `_iniciar_hop`
+        (`garantir_carregado_assincrono` em paralelo, já corrigido antes)."""
+        ids = self._ids_existentes
         return [
             d
             for d in DIRECOES_VETOR
-            if all(
-                self._repositorio.obter(f"flutuando_{d}_{sufixo}").id == f"flutuando_{d}_{sufixo}"
-                for sufixo in ("iniciar", "loop", "parar")
-            )
+            if all(f"flutuando_{d}_{sufixo}" in ids for sufixo in ("iniciar", "loop", "parar"))
         ]
 
     def _direcao_mais_proxima(self, dx: float, dy: float, disponiveis: list[str]) -> str:
@@ -564,6 +607,53 @@ class BehaviorScheduler(QObject):
         direcao = random.choice(disponiveis)
         self._iniciar_hop(direcao, DISTANCIA_WANDER_PX)
 
+    def forcar_movimento(self, direcao: str) -> bool:
+        """Dispara o MESMO par animação+deslocamento físico do Wander
+        (`_iniciar_hop`), mas pra uma direção escolhida por FORA do
+        scheduler - usado pela Gesture Wheel (`gesture_wheel.py`, item
+        "Ações", achado ao vivo pelo usuário 2026-09-04: "ao fazer
+        movimentos como subida, ela n esta se movendo"). Antes disso, o
+        clique na roda só chamava `AnimationController.solicitar_transicao`
+        direto - troca o CLIPE, mas o deslocamento de verdade sempre viveu
+        SEPARADO, só aqui dentro do scheduler (`_iniciar_hop`). MESMOS
+        guards do Wander autônomo: recusa se o scheduler já está ocupado
+        com outra coisa (evita 2 movimentos concorrentes) ou se não sobra
+        pelo menos 1px de deslocamento real nessa direção (perto de uma
+        borda, ex.). Devolve `False` nesses casos - quem chama decide o
+        que fazer (`GestureWheel` cai pra `solicitar_transicao` puro, só
+        troca o clipe, melhor que não fazer nada)."""
+        if self._ocupado or direcao not in DIRECOES_VETOR or not self._pode_avancar(direcao):
+            logger.info(
+                "forcar_movimento(%s) RECUSADO (ocupado=%s, direcao_valida=%s, cabe_avancar=%s)",
+                direcao, self._ocupado, direcao in DIRECOES_VETOR,
+                direcao in DIRECOES_VETOR and self._pode_avancar(direcao),
+            )
+            return False
+        logger.info("forcar_movimento(%s) aceito", direcao)
+        self._ocupado = True
+        self._iniciar_hop(direcao, DISTANCIA_WANDER_PX)
+        return True
+
+    def forcar_sentar(self) -> bool:
+        """Mesma jornada até a barra que o Taskbar Sit autônomo já faz
+        (`_executar_taskbar_sit`) - usado quando o usuário escolhe
+        "sentar" manualmente pela Gesture Wheel (achado ao vivo,
+        2026-09-05: "qnd eu mando ela sentar, ela tem q ir ate a barra
+        antes de realizar a animação direto onde esta") - antes, escolher
+        `flutuando_para_sentada` na roda ia direto pro
+        `AnimationController.solicitar_transicao`, sem passar pela barra,
+        sentando no ar onde ela estivesse. MESMO guard de
+        `ir_para_destino`: só a partir do idle flutuando calmo."""
+        if self._ocupado or self._controller.animacao_atual != "flutuando_idle":
+            logger.info(
+                "forcar_sentar() RECUSADO (ocupado=%s, animacao_atual=%s, precisa ser flutuando_idle)",
+                self._ocupado, self._controller.animacao_atual,
+            )
+            return False
+        logger.info("forcar_sentar() aceito")
+        self._executar_taskbar_sit()
+        return True
+
     def ir_para_destino(self, x: float, y: float) -> None:
         """"Ir até aqui" (pedido do usuário, 2026-08-29: hotkey de
         modificador+clique, ver `click_destino.py`) - persegue um ponto
@@ -571,7 +661,12 @@ class BehaviorScheduler(QObject):
         disponíveis (não existe clipe de "flutuar num ângulo exato"),
         até chegar perto o bastante ou estourar `MAX_SALTOS_DESTINO`."""
         if self._ocupado or self._controller.animacao_atual != "flutuando_idle":
+            logger.info(
+                "ir_para_destino(%.0f, %.0f) RECUSADO (ocupado=%s, animacao_atual=%s, precisa ser flutuando_idle)",
+                x, y, self._ocupado, self._controller.animacao_atual,
+            )
             return  # ação em andamento nunca é cortada - clique de novo quando ela estiver livre
+        logger.info("ir_para_destino(%.0f, %.0f) aceito", x, y)
         area_x, area_y, area_largura, area_altura = self._geometria_permitida()
         alvo_x = min(max(x, area_x), area_x + area_largura)
         alvo_y = min(max(y, area_y), area_y + area_altura)
@@ -686,9 +781,51 @@ class BehaviorScheduler(QObject):
             self._ocupado = False
             return
 
-        asset_iniciar = self._repositorio.obter(f"flutuando_{direcao}_iniciar")
-        asset_parar = self._repositorio.obter(f"flutuando_{direcao}_parar")
-        asset_loop = self._repositorio.obter(f"flutuando_{direcao}_loop")
+        # 🔥 CORRIGIDO (2026-09-04, achado ao vivo com medição: "ela trava
+        # ate p sentar... travou na hora de subir" -> log confirmou
+        # `forcar_movimento("subida")` bloqueando a thread principal por
+        # 1567ms quando os 3 clipes da direção ainda não estavam em cache)
+        # - antes, os 3 assets abaixo eram lidos com `AssetRepository.obter`
+        # (SÍNCRONO, "só pro cold-start" pelo próprio contrato dela) em
+        # pleno RUNTIME, pra CADA salto: 200-900ms bloqueado POR CLIPE,
+        # somados linearmente (~1,4s medido pros 3 juntos). Agora usa
+        # `garantir_carregado_assincrono` pros 3 em PARALELO - a coreografia
+        # (que precisa saber a duração real dos 3 antes de poder começar,
+        # por isso não dava só pra trocar a chamada) só arranca em
+        # `_ao_assets_prontos`, chamado quando o último dos 3 chegar.
+        # Continua parecendo síncrono no caso comum (já em cache - o
+        # próprio `garantir_carregado_assincrono` chama de volta na mesma
+        # pilha) - só passa a esperar de verdade, sem travar nada, quando
+        # algum dos 3 precisa carregar do disco.
+        logger.info("_iniciar_hop(direcao=%s, distancia=%.0fpx) começando (assíncrono)", direcao, distancia_px)
+        ids_necessarios = (
+            f"flutuando_{direcao}_iniciar", f"flutuando_{direcao}_parar", f"flutuando_{direcao}_loop",
+        )
+        assets_prontos: dict[str, AnimationAsset] = {}
+
+        def _callback_asset(id_asset: str):
+            def _callback(asset: AnimationAsset) -> None:
+                assets_prontos[id_asset] = asset
+                if len(assets_prontos) == len(ids_necessarios):
+                    self._ao_assets_do_hop_prontos(
+                        direcao, distancia_px, ao_concluir,
+                        assets_prontos[ids_necessarios[0]],
+                        assets_prontos[ids_necessarios[1]],
+                        assets_prontos[ids_necessarios[2]],
+                    )
+            return _callback
+
+        for id_asset in ids_necessarios:
+            self._repositorio.garantir_carregado_assincrono(id_asset, _callback_asset(id_asset))
+
+    def _ao_assets_do_hop_prontos(
+        self, direcao: str, distancia_px: float, ao_concluir: Callable[[], None] | None,
+        asset_iniciar: AnimationAsset, asset_parar: AnimationAsset, asset_loop: AnimationAsset,
+    ) -> None:
+        """Continuação de `_iniciar_hop` depois que os 3 clipes da direção
+        já estão garantidamente em cache (ver comentário lá) - monta a
+        MESMA coreografia de sempre, só que a partir daqui em vez de
+        direto em `_iniciar_hop`."""
         duracao_iniciar_ms = asset_iniciar.frame_count * asset_iniciar.frame_duration_ms
         duracao_parar_ms = asset_parar.frame_count * asset_parar.frame_duration_ms
         duracao_loop_ms = asset_loop.frame_count * asset_loop.frame_duration_ms

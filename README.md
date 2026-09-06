@@ -9,8 +9,8 @@ conversa ancorada à personagem).
 
 Arquitetura completa e decisões de design em [`ARQUITETURA.md`](ARQUITETURA.md).
 Guia completo do fluxo vídeo → importação → catálogo → runtime em
-[`ANIMACOES_GALATEIA.md`](ANIMACOES_GALATEIA.md). Plano original (todas
-as fases, 0 a 8): `C:\Workspace\Project LOKI.md`.
+[`ANIMACOES_GALATEIA.md`](ANIMACOES_GALATEIA.md). Histórico completo
+(features, correções, achados) em [`CHANGELOG.md`](CHANGELOG.md).
 
 ## A origem do nome
 
@@ -32,8 +32,26 @@ em "modo demonstração" - útil pra testar animações/comportamentos sem
 precisar da GAIA rodando. A bandeja do sistema tem um submenu "Forçar
 animação" (playground de teste) além de Configurações/Sair.
 
+Pra rodar em segundo plano sem terminal (mesmo padrão dos outros
+satélites): `iniciar_loki.bat` (sobe via `pythonw.exe`, sem console) ou
+`iniciar_loki_oculto.vbs` (esconde também o console do próprio `.bat`).
+`criar_atalho_desktop.vbs` cria um atalho "LOKI" na Área de Trabalho
+apontando pro `.vbs` oculto - rodar uma vez só, depois de clonar o repo.
+Em qualquer um dos dois modos, **Configurações** funciona normalmente. O
+CompanionPanel pode abrir, mas enviar mensagens ainda depende da GAIA conectada.
+
 Config e posição salva ficam em `data/mascot_config.json`/`data/
 mascot_posicao.json`, criados sozinhos na 1ª execução.
+
+O botão **Ações** do Menu SAO abre uma roda de gestos plana,
+inspirada no menu de emotes de Don't Starve Together. No centro da tela os
+botões formam um círculo; perto de bordas viram uma meia-roda; nos cantos,
+duas fileiras curvas dentro de um quadrante. Em **Configurações → Roda de
+ações** dá para escolher animações, páginas, quantidade por página, grupos e
+uma imagem própria para cada botão. A rolagem sobre a GAIA ou a roda troca de
+página; enquanto ela está aberta, a personagem permanece imóvel.
+Uma lista `acoes` vazia usa automaticamente as animações válidas do estado
+atual. Se preenchida, funciona como a lista ordenada de favoritas.
 
 ## Consumido pela GAIA
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Contrato de carregamento de animações do LOKI/Mascot (Fase 0 do plano,
-`C:\\Workspace\\Project LOKI.md`, seção 7.1) - único ponto que sabe ler
+"""Contrato de carregamento de animações do LOKI/Mascot (ver `ARQUITETURA.md`,
+"Contrato de asset") - único ponto que sabe ler
 `assets/galateia/animations/`. Descobre os assets existentes dinamicamente;
 o catálogo de estados decide quais deles podem ser pedidos pelo runtime.
 
@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from functools import cached_property
@@ -530,16 +531,29 @@ class AssetRepository(QObject):
     def obter(self, animation_id: str) -> AnimationAsset:
         """Síncrono - bloqueia a thread de quem chamar se não estiver em
         cache (200-900ms medido pras animações reais). Só pro cold-start
-        (ver docstring da classe) - o runtime usa `garantir_carregado_assincrono`."""
+        (ver docstring da classe) - o runtime usa `garantir_carregado_assincrono`.
+
+        Loga em WARNING toda vez que precisa carregar de verdade (não é
+        cache hit) - 2026-09-04, achado ao vivo ("ela trava ate p
+        sentar... travou na hora de subir"): `BehaviorScheduler._iniciar_hop`
+        chama isso pros 3 assets de CADA salto (runtime, não cold-start),
+        violando o contrato documentado acima. Esse log é o jeito de
+        confirmar/medir isso com precisão em vez de só suspeitar."""
         if animation_id in self._cache:
             self._cache.move_to_end(animation_id)
             return self._cache[animation_id]
+        inicio = time.perf_counter()
         try:
             asset = AnimationAsset.carregar(animation_id, self._geometria)
         except (AssetAusente, AssetInvalido):
             if animation_id == ANIMACAO_FALLBACK:
                 raise  # o próprio fallback falhou - nada seguro sobra, propaga de vez
             return self.obter(ANIMACAO_FALLBACK)
+        duracao_ms = (time.perf_counter() - inicio) * 1000
+        logger.warning(
+            "obter(%s) SÍNCRONO fora do cache bloqueou a thread chamadora por %.0fms",
+            animation_id, duracao_ms,
+        )
         self._inserir_no_cache(asset)
         return asset
 
@@ -579,7 +593,9 @@ class AssetRepository(QObject):
             return
         callbacks = list(pendente["callbacks"]) if pendente else []
         callbacks.append(ao_concluir)
-        self._carregando[animation_id] = {"prioridade": prioridade, "callbacks": callbacks}
+        self._carregando[animation_id] = {
+            "prioridade": prioridade, "callbacks": callbacks, "inicio": time.perf_counter(),
+        }
         semaforo = self._semaforo_principal if prioridade else self._semaforo_preload
         threading.Thread(target=self._carregar_em_thread, args=(animation_id, semaforo), daemon=True).start()
 
@@ -622,7 +638,20 @@ class AssetRepository(QObject):
                 return  # nada seguro sobra - callbacks nunca são chamados, quem espera fica no que já tinha
             self.garantir_carregado_assincrono(ANIMACAO_FALLBACK, lambda asset: [cb(asset) for cb in callbacks])
             return
+        # Duração total (disco+decodificação em segundo plano) separada do
+        # tempo de `de_dados_brutos` (conversão QImage->QPixmap, ESSA parte
+        # roda na thread PRINCIPAL, ver docstring da classe) - 2026-09-04,
+        # hipótese a confirmar: pra clipes com muitos frames, essa
+        # conversão sozinha já pode ser grande o bastante pra travar a UI
+        # um instante, mesmo com o resto todo em segundo plano.
+        duracao_fundo_ms = (time.perf_counter() - pendente["inicio"]) * 1000 if pendente else -1.0
+        inicio_conversao = time.perf_counter()
         asset = AnimationAsset.de_dados_brutos(dados)
+        duracao_conversao_ms = (time.perf_counter() - inicio_conversao) * 1000
+        logger.info(
+            "async %s pronto: %.0fms em segundo plano + %.0fms convertendo pra QPixmap (thread principal)",
+            animation_id, duracao_fundo_ms, duracao_conversao_ms,
+        )
         self._inserir_no_cache(asset)
         for callback in callbacks:
             callback(asset)

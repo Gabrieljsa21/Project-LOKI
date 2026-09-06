@@ -341,7 +341,7 @@ def build_items(paths: Sequence[Path], args: argparse.Namespace, config: dict[st
         path = path.expanduser().resolve()
         if not path.exists():
             raise FileNotFoundError(f"Fonte não encontrada: {path}")
-        if normalized_path(path) in existing_sources:
+        if normalized_path(path) in existing_sources and not args.reverse:
             raise ValueError(f"A fonte já está registrada: {path}")
         if path.is_dir() and not frame_folder(path):
             raise ValueError(f"A pasta não parece conter uma sequência numerada de frames: {path}")
@@ -385,6 +385,8 @@ def build_items(paths: Sequence[Path], args: argparse.Namespace, config: dict[st
             item["skipStart"] = args.skip_start
         if args.skip_end:
             item["skipEnd"] = args.skip_end
+        if args.reverse:
+            item["reverse"] = True
         built.append(item)
     return built
 
@@ -414,6 +416,7 @@ def run_checked(command: Sequence[str], cwd: Path = PROJECT_ROOT) -> None:
 def run_pipeline(ids: Sequence[str], args: argparse.Namespace) -> None:
     importer = Path(__file__).with_name("importar_lote_animacoes.py")
     validator = Path(__file__).with_name("validar_animacoes.py")
+    thumbnails = Path(__file__).with_name("gerar_miniaturas_gesture_wheel.py")
     command = [sys.executable, str(importer), "--config", str(args.config)]
     for animation_id in ids:
         command.extend(("--only", animation_id))
@@ -423,6 +426,10 @@ def run_pipeline(ids: Sequence[str], args: argparse.Namespace) -> None:
         command.append("--preview")
     run_checked(command)
     run_checked([sys.executable, str(validator), "--config", str(args.config)])
+    thumbnail_command = [sys.executable, str(thumbnails)]
+    for animation_id in ids:
+        thumbnail_command.extend(("--only", animation_id))
+    run_checked(thumbnail_command)
 
 
 def load_cache_metadata(animation_id: str, cache_root: Path) -> dict[str, object] | None:
@@ -635,6 +642,10 @@ def add_registration_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--feather", type=float)
     parser.add_argument("--skip-start", type=int, default=0)
     parser.add_argument("--skip-end", type=int, default=0)
+    parser.add_argument(
+        "--reverse", action="store_true",
+        help="Importa os quadros da fonte em ordem inversa; permite reutilizar uma fonte já registrada.",
+    )
     parser.add_argument("--origin", help="Estado lógico de origem; use none para nulo.")
     parser.add_argument("--destination", help="Estado lógico de destino.")
     parser.add_argument("--fallback", help="Próximo clipe; use none para nulo.")

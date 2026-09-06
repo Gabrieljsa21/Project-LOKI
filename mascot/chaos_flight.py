@@ -6,7 +6,7 @@ sair do monitor, separado da Gaia - achado com o usuário 2026-09-02:
 ele que tem que subir todo monitor", enquanto ELA continua na PRÓPRIA
 janela fazendo `flutuando_idle` normalmente. Como `AnimationController`/
 `MascotWindow` só tocam UM clipe por vez (uma personagem, não uma
-colônia - `Project LOKI.md`), mostrar as duas coisas se movendo de forma
+colônia - `ARQUITETURA.md`, "Princípios"), mostrar as duas coisas se movendo de forma
 independente ao mesmo tempo precisa de uma segunda janela, só pra isso -
 sem estado, sem grafo, sem clique, some sozinha quando sai da tela.
 

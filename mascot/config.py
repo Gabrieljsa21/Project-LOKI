@@ -70,7 +70,7 @@ MASCOT_PADRAO = {
     # verdade, não o tamanho comprimido do arquivo (`AssetRepository`,
     # `mascot/asset_repository.py::ORCAMENTO_MEMORIA_PADRAO_MB`) -
     # até aqui só um valor fixo no código (320MB, calibrado medindo ao
-    # vivo - ver `C:\Workspace\Project LOKI.md`, Achados 4/5 da Fase 5).
+    # vivo - ver `CHANGELOG.md` da GAIA, correções de memória do Mascot/LOKI).
     # Pedido do usuário, 2026-09-02: "coloca aqueles limites de memoria e
     # tudo p ser configuravel" - exposto no Painel ("🧚 Mascot (LOKI)" →
     # Desempenho).

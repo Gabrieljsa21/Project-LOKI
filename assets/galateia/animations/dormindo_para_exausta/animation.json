@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "leque_esnobe_para_neutra",
+  "id": "dormindo_para_exausta",
   "character": "galateia",
   "assetType": "character",
   "texture": "spritesheet.webp",
-  "frameCount": 48,
+  "frameCount": 120,
   "frameDurationMs": 83,
   "effectiveFps": 12.048,
   "loop": false,
@@ -20,8 +20,8 @@
     "bottom": 717
   },
   "grid": {
-    "columns": 7,
-    "rows": 7,
+    "columns": 11,
+    "rows": 11,
     "cellWidth": 384,
     "cellHeight": 342
   },
@@ -30,6 +30,6 @@
     "y": 342
   },
   "unusedCells": [
-    48
+    120
   ]
 }

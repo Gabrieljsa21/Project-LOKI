@@ -15,8 +15,11 @@ CompanionPanel existir.
 """
 from __future__ import annotations
 
+import logging
 import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import keyboard
@@ -25,12 +28,70 @@ RAIZ_APP = Path(__file__).resolve().parents[1]
 if str(RAIZ_APP) not in sys.path:
     sys.path.insert(0, str(RAIZ_APP))
 
+CAMINHO_LOG = RAIZ_APP / "data" / "mascot.log"
+# Intervalo do watchdog de travada (2026-09-04, achado ao vivo: "ela trava
+# ate p sentar... no inicio ela ate parou de responder... travou na hora
+# de subir - coloca uns logs p ter mais precisao doq ela fez e qnt tempo
+# demorou") - roda em MENOR intervalo do que qualquer travada que valha a
+# pena registrar; qualquer atraso ENTRE dois disparos maior que
+# `LIMIAR_TRAVADA_MS` significa que a thread principal (a MESMA que
+# desenha/processa cliques) ficou presa nesse meio tempo, não importa a
+# causa - trabalho síncrono em `AssetRepository`/`BehaviorScheduler`,
+# GC, ou qualquer outra coisa.
+INTERVALO_WATCHDOG_MS = 150
+LIMIAR_TRAVADA_MS = 300
+
+
+def configurar_logging() -> None:
+    """`pythonw.exe` não tem console - sem gravar em ARQUIVO, todo
+    `logger.info`/`.warning` espalhado pelo `mascot/` (vários módulos já
+    têm `logging.getLogger(__name__)`, mas ninguém nunca configurou um
+    HANDLER) ia parar no "handler de último recurso" do Python, que
+    escreve em stderr - inexistente aqui, ou seja, se perdia
+    silenciosamente. `mode="w"` (sobrescreve a cada processo novo, não
+    acumula entre sessões) - é um log de diagnóstico de UMA sessão, não
+    histórico permanente (isso já é papel do `CHANGELOG.md`)."""
+    CAMINHO_LOG.parent.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s.%(msecs)03d [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[logging.FileHandler(CAMINHO_LOG, mode="w", encoding="utf-8")],
+    )
+
+
+def _instalar_watchdog_travada(app: QApplication) -> QTimer:
+    """Detecta QUALQUER travada da thread principal, não só as que já
+    suspeitamos - mede o intervalo REAL entre dois disparos deste timer;
+    se ficar bem maior que `INTERVALO_WATCHDOG_MS`, é porque algo prendeu
+    o event loop nesse meio tempo (não importa o quê). Complementa os
+    logs pontuais de `AssetRepository`/`BehaviorScheduler` (que dizem O
+    QUÊ estava rodando) com O QUANTO isso realmente travou a UI."""
+    logger_watchdog = logging.getLogger("mascot.watchdog")
+    estado = {"ultimo": time.monotonic()}
+
+    def _tick() -> None:
+        agora = time.monotonic()
+        gap_ms = (agora - estado["ultimo"]) * 1000
+        if gap_ms > LIMIAR_TRAVADA_MS:
+            logger_watchdog.warning(
+                "TRAVADA detectada: %.0fms sem a thread principal responder (esperado ~%dms)",
+                gap_ms, INTERVALO_WATCHDOG_MS,
+            )
+        estado["ultimo"] = agora
+
+    timer = QTimer(app)
+    timer.timeout.connect(_tick)
+    timer.start(INTERVALO_WATCHDOG_MS)
+    return timer
+
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from core import mascot_events
-from mascot import config, state_catalog
+from mascot import config
+from mascot.animacao_menu import preencher_menu_forcar_animacao
 from mascot.animation_controller import AnimationController
 from mascot.asset_repository import AssetRepository
 from mascot.behavior_scheduler import BehaviorScheduler
@@ -38,6 +99,7 @@ from mascot.click_destino import ClickDestinoWatcher
 from mascot.companion_panel import CompanionPanel
 from mascot.menu_sao import MenuSAO
 from mascot.protocol.server import MascotBridgeServer
+from mascot.qt_widgets import confirmar_acao
 from mascot.safety import SafetyController
 from mascot.state_controller import StateController
 from mascot.window import MascotWindow
@@ -66,6 +128,7 @@ class MascotApp:
     def __init__(self):
         self.config_mascot = config.carregar_config_mascot()
         self.config_behaviors = config.carregar_config_behaviors()
+        self._modal_configuracoes = None  # instância única, ver _abrir_configuracoes
 
         self.repositorio = AssetRepository(orcamento_mb=self.config_mascot["memoria_orcamento_mb"])
         self.controller = AnimationController(repositorio=self.repositorio)
@@ -109,11 +172,12 @@ class MascotApp:
         # (`scheduler.interromper_para_arraste`, acima).
         self.menu_sao = MenuSAO(
             self.window, self.safety, self.companion_panel,
+            controller=self.controller, mascot_app=self,
             estilo_id=self.config_mascot.get("menu_sao_estilo", "vidro"),
         )
         self.window.scroll_baixo_confirmado.connect(self.menu_sao.abrir)
         self.window.scroll_cima_confirmado.connect(self.menu_sao.fechar)
-        self.window.arraste_iniciado.connect(lambda: self.menu_sao.fechar(imediato=True))
+        self.window.arraste_iniciado.connect(lambda: self.menu_sao.fechar_tudo(imediato=True))
 
         self.bridge = self._montar_bridge()
 
@@ -222,8 +286,66 @@ class MascotApp:
             self.companion_panel.receber_resposta(mensagem)
         elif tipo == "user_message":
             self.companion_panel.receber_mensagem_usuario(mensagem)
+        elif tipo == "settings_requested":
+            # GAIA -> Mascot (botão "🧚 Mascot (LOKI)" do Painel, 2026-09-03) -
+            # o modal de configurações agora é NATIVO daqui (`modal_
+            # configuracoes.py`), a GAIA só pede pra abrir porque não pode
+            # instanciar um QWidget deste processo direto.
+            self._abrir_configuracoes()
         elif tipo == "shutdown":
             QApplication.quit()
+
+    def _abrir_configuracoes(self) -> None:
+        """Instância ÚNICA e persistente (mesmo padrão de `_abrir_modal_
+        persistente`, `ui/qt_painel.py` da GAIA) - `.show()` não-modal (não
+        `.exec()`), reaproveitada em toda chamada seguinte, tanto pela
+        bandeja quanto pelo Menu SAO ("GAIA", `menu_sao.py`) quanto pelo
+        evento vindo da GAIA acima. Nunca duas instâncias/duas fontes de
+        verdade pro mesmo modal."""
+        if self._modal_configuracoes is None:
+            from mascot.modal_configuracoes import ModalConfiguracoes
+            self._modal_configuracoes = ModalConfiguracoes(self, parent=self.window)
+        self._modal_configuracoes.show()
+        self._modal_configuracoes.raise_()
+        self._modal_configuracoes.activateWindow()
+
+    def reiniciar_mascot(self) -> None:
+        """Sobe um processo NOVO (mesmo comando/cwd que `MascotSupervisor.
+        iniciar()` usa do lado da GAIA: `pythonw.exe -m mascot.process_main`,
+        cwd na raiz do repo) ANTES de fechar o atual - herda o ambiente
+        inteiro (`os.environ`), então se estiver rodando sob supervisão da
+        GAIA (`GAIA_MASCOT_CANAL`/`GAIA_MASCOT_TOKEN` no ambiente) o novo
+        processo sobe o MESMO canal/token e o cliente da GAIA reconecta
+        sozinho (retry automático já existe em `MascotBridgeClient`, do
+        lado de lá) - sem precisar avisar a GAIA nem mexer no repo dela.
+
+        Fonte única (2026-09-06, pedido do usuário: "coloca o botão de
+        reiniciar loki tbm na bandeja") - antes só existia dentro de
+        `ModalConfiguracoes._reiniciar_mascot` ("Tem q ter um botao p
+        reiniciar nela, n apenas na gaia", 2026-09-04); o modal agora só
+        chama isso, pra bandeja e Configurações nunca terem duas cópias da
+        mesma lógica de reiniciar.
+
+        Limitação aceita conscientemente (não corrigida, exigiria mudar o
+        protocolo dos dois lados): `MascotSupervisor` rastreia o Mascot pelo
+        `Popen` exato que ELA subiu - reiniciar por AQUI troca o processo
+        real sem ela saber, então o switch "Ativado" do Painel dela pode
+        mostrar "desligado" por engano até a GAIA reiniciar, e desligar por
+        lá logo em seguida pode não matar o processo novo (ela tentaria
+        matar o PID antigo, que já nem existe mais). "Sair" pela bandeja
+        deste próprio LOKI continua sendo o jeito garantido de fechar de
+        vez."""
+        if not confirmar_acao(
+            self.window, "Reiniciar Mascot",
+            "Fecha este Mascot e abre um novo agora. Confirma?",
+        ):
+            return
+        subprocess.Popen(
+            [sys.executable, "-m", "mascot.process_main"],
+            cwd=str(RAIZ_APP),
+            env=os.environ.copy(),
+        )
+        QApplication.quit()
 
     def _montar_tray(self) -> QSystemTrayIcon:
         # `QIcon.fromTheme` depende de um tema de ícones freedesktop, que o
@@ -264,6 +386,16 @@ class MascotApp:
 
         menu.addSeparator()
         menu.addMenu(self._montar_submenu_playground(menu))
+
+        acao_configuracoes = QAction("⚙️ Configurações...", menu)
+        acao_configuracoes.triggered.connect(self._abrir_configuracoes)
+        menu.addAction(acao_configuracoes)
+
+        # 2026-09-06, pedido do usuário: "coloca o botão de reiniciar loki
+        # tbm na bandeja" - antes só existia dentro de Configurações.
+        acao_reiniciar = QAction("🔄 Reiniciar Mascot", menu)
+        acao_reiniciar.triggered.connect(self.reiniciar_mascot)
+        menu.addAction(acao_reiniciar)
 
         menu.addSeparator()
         acao_sair = QAction("Sair", menu)
@@ -310,32 +442,12 @@ class MascotApp:
         return submenu
 
     def _preencher_submenu_playground(self, submenu: QMenu) -> None:
-        """Só lista animações VÁLIDAS a partir do estado lógico ATUAL (mesmo
-        grafo que `AnimationController.solicitar_transicao` já usa pra
-        validar, `state_catalog.transicoes_validas_a_partir_de`) - antes
-        listava o catálogo INTEIRO (~60 ids) sempre, incluindo
-        "complementos" que só existem dentro de uma sequência (ex.: toda
-        ação "sentada_*" tem `estado_origem="sentada"` - exige estar sentada
-        primeiro). Clicar um complemento fora de hora já era REJEITADO em
-        silêncio por `solicitar_transicao` (só loga um aviso, nada visível
-        pro usuário) - pedido do usuário (2026-09-01): "Algumas animações
-        são complementos de outras, n devem ser listadas ali na bandeja, ou
-        se clicadas, tem de ser ativas desde o inicio do fluxo". Resolvido
-        filtrando, não encadeando automaticamente - um complemento só
-        aparece (e só fica clicável) depois que o usuário já disparou a
-        transição que leva até o estado-pai dele, o mesmo caminho que o
-        fluxo real de animação percorreria."""
-        submenu.clear()
-        validas = sorted(e.id for e in state_catalog.transicoes_validas_a_partir_de(self.controller.estado_logico))
-        if not validas:
-            acao_vazia = QAction("(nenhuma a partir do estado atual)", submenu)
-            acao_vazia.setEnabled(False)
-            submenu.addAction(acao_vazia)
-            return
-        for animation_id in validas:
-            acao = QAction(animation_id, submenu)
-            acao.triggered.connect(lambda _checked=False, id_=animation_id: self.controller.solicitar_transicao(id_))
-            submenu.addAction(acao)
+        """Conteúdo recalculado toda vez que o submenu abre (`aboutToShow`) -
+        `preencher_menu_forcar_animacao` (`mascot/animacao_menu.py`, extraído
+        2026-09-03 quando o Menu SAO passou a precisar do MESMO conteúdo,
+        ver `menu_sao.py::_construir_menu_forcar_animacao`) já cuida de
+        limpar e listar só as transições válidas a partir do estado atual."""
+        preencher_menu_forcar_animacao(submenu, self.controller)
 
     def _centralizar_janela(self) -> None:
         tela = self.window.screen() or QApplication.primaryScreen()
@@ -352,9 +464,18 @@ class MascotApp:
 
 
 def main() -> int:
+    configurar_logging()
+    logging.getLogger("mascot.process_main").info("Mascot iniciando (PID %d)", os.getpid())
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # a bandeja continua viva com a janela oculta
+    # Mesmo padrão visual da GAIA (Fusion + QScrollBar/QMenu dourados,
+    # `mascot/qt_widgets.py`, vendorizado 2026-09-03 pro modal de
+    # configurações nativo) - aplicado uma vez aqui, vale pro processo
+    # inteiro (inclusive QMenu da bandeja e do "Ações").
+    from mascot.qt_widgets import aplicar_estilo_global
+    aplicar_estilo_global(app)
     mascot_app = MascotApp()  # referência precisa sobreviver ao app.exec() (senão o GC recolhe tudo)
+    _watchdog = _instalar_watchdog_travada(app)  # referência precisa sobreviver junto (mesmo motivo)
     return app.exec()
 
 

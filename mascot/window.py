@@ -45,6 +45,22 @@ ARRASTADA_LOOPS = (
     "arrastada_loop_emburrada",
 )
 
+# MESMO padrão de ARRASTADA_LOOPS acima, achado 2026-09-06 investigando
+# "o ficar esnobe parece q esta sem o final tbm" - `flutuando_para_leque`
+# também só declara UM fallback fixo (`null` no catálogo, tratado então
+# como "pose terminal"), mas ao contrário do que o CHANGELOG registrou
+# antes (2026-09-04, "é INTENCIONAL... não sofre do mesmo bug"), NUNCA
+# existiu nenhum código escolhendo um dos 3 loops - ela ficava mesmo
+# travada no último quadro de `flutuando_para_leque`, sem entrar em
+# nenhum loop de humor, até o usuário clicar manualmente "Ficar Esnobe"/
+# "Ficar Neutra" pela bandeja. Sorteada aqui na hora que ela entra em
+# "leque" (ver `MascotWindow._ao_estado_alterado`), mesma lógica.
+LEQUE_LOOPS = (
+    "leque_ironica_loop",
+    "leque_esnobe_loop",
+    "leque_sorriso_loop",
+)
+
 
 def _carregar_posicao_salva(monitores: int) -> dict | None:
     if not CAMINHO_POSICAO.is_file():
@@ -99,11 +115,18 @@ class MascotWindow(QWidget):
         self._fluxo_arraste_ativo = False
         self._arraste_pendente_finalizacao = False
         self._reacao_arraste_definida = False
+        # Sem reset em lugar nenhum ainda (2026-09-06) - `leque` não tem
+        # NENHUMA transição de volta pra "flutuando" hoje (só as 3
+        # variações de humor entre si), então "flutuando_para_leque" só é
+        # alcançável 1x por processo mesmo; quando um dia existir um
+        # "leque_para_flutuando", resetar este flag junto dele.
+        self._reacao_leque_definida = False
         self._click_through = False
         self._acumulador_scroll = 0.0
         self._ultimo_scroll_s = 0.0
         self._queda = MovimentoAmortecido(rigidez=90.0, amortecimento=14.0, parent=self)
         self._queda_arraste = MovimentoQuedaGravidade(parent=self)
+        self._pouso_heroico_pendente = False
         self._halo = Halo()
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -248,6 +271,10 @@ class MascotWindow(QWidget):
         return "ninja" in self._controller.tags_atuais
 
     def mousePressEvent(self, event) -> None:
+        roda = getattr(self, "_gesture_wheel_overlay", None)
+        if roda is not None and roda.esta_aberta:
+            event.accept()
+            return
         if event.button() == Qt.MouseButton.LeftButton and not self._em_substituicao_ninja():
             self._arrastando = True
             self._offset_arraste = event.globalPosition().toPoint() - self.pos()
@@ -255,6 +282,11 @@ class MascotWindow(QWidget):
             event.accept()
 
     def mouseMoveEvent(self, event) -> None:
+        roda = getattr(self, "_gesture_wheel_overlay", None)
+        if roda is not None and roda.esta_aberta:
+            self._arrastando = False
+            event.accept()
+            return
         if self._arrastando and self._em_substituicao_ninja():
             # a própria Substituição Ninja nasce de um arraste em
             # andamento - solta o arraste NA HORA, em vez de continuar
@@ -294,6 +326,13 @@ class MascotWindow(QWidget):
         usuário (gesto físico de "scroll para baixo" do doc); POSITIVO =
         pra cima. Ignorado durante arraste real (`_arrastando`) - os dois
         gestos não deveriam se misturar."""
+        roda = getattr(self, "_gesture_wheel_overlay", None)
+        if roda is not None and roda.esta_aberta:
+            delta = event.angleDelta().y()
+            if delta:
+                roda.trocar_pagina(-1 if delta > 0 else 1)
+            event.accept()
+            return
         if self._arrastando:
             event.ignore()
             return
@@ -317,6 +356,18 @@ class MascotWindow(QWidget):
     # DESLOCAMENTO físico ganha essa pausa + aceleração contínua depois
     # dela (ver `MovimentoQuedaGravidade`).
     PAUSA_QUEDA_MS = 1000.0
+
+    # Queda heroica (2026-09-05, pedido do usuário: "ajustar o tempo de
+    # queda... p tentar controlar velocidade" + trocar pra próxima
+    # animação assim que ela estiver quase chegando embaixo, não num
+    # tempo fixo) - duração da queda passou a ser PROPORCIONAL à
+    # distância real até o piso (queda livre: distância = ½·a·t²), em
+    # vez de sempre igual à duração fixa do clipe `agarrada_para_queda-
+    # heroica` (~4s, não importava se a distância era de 100px ou
+    # 1000px). Constantes ajustáveis por enquanto sem validação ao vivo
+    # de altura variada - ver `_disparar_queda_heroica`.
+    ACELERACAO_QUEDA_HEROICA_PXS2 = 140.0
+    MARGEM_QUASE_CHAO_HEROICA_PX = 120.0
 
     # Substituição ninja (2026-09-02, pedido do usuário) - reação RARA
     # alternativa a ser agarrada quando o arraste começa a partir do idle
@@ -428,10 +479,24 @@ class MascotWindow(QWidget):
         self._fluxo_arraste_ativo = False
         if self._controller.estado_logico != "agarrada":
             self._controller.forcar_estado("arrastada_loop_calma")
-        queda = random.choice(("arrastada_para_queda-joelho", "arrastada_para_queda-bunda"))
+        queda = random.choice((
+            "arrastada_para_queda-joelho",
+            "arrastada_para_queda-bunda",
+            "agarrada_para_queda-heroica",
+        ))
         self._disparar_queda_do_arraste(queda)
 
     def _ao_estado_alterado(self, estado: str) -> None:
+        if estado == "queda-heroica" and not self._pouso_heroico_pendente:
+            # Rede de segurança: só dispara AQUI se `_disparar_queda_heroica`
+            # não estiver controlando a troca por posição (ex.: já estava
+            # praticamente no chão quando foi solta, sem distância pra cair -
+            # `_disparar_queda_do_arraste` retorna cedo nesse caso e nunca
+            # arma `_pouso_heroico_pendente`). Durante uma queda de verdade,
+            # esse flag fica True e quem decide a hora certa é
+            # `_ao_mover_queda_heroica`, baseado na posição real, não no
+            # instante em que o estado troca (loop repete até então).
+            self._controller.solicitar_transicao("queda-heroica_para_pouso")
         if estado == "substituicao-ninja":
             # única fronteira que leva a esse estado_destino (catálogo,
             # `flutuando_para_substituicao-ninja`) - o próprio 1º clipe
@@ -444,6 +509,16 @@ class MascotWindow(QWidget):
             # e sem essa trava cada troca chamaria a si mesma pra sempre.
             self._reacao_arraste_definida = True
             self._controller.solicitar_transicao(random.choice(ARRASTADA_LOOPS))
+        if estado == "leque" and not self._reacao_leque_definida:
+            # MESMO raciocínio de "agarrada" acima (a flag evita
+            # recursão - `leque_*_loop` também é self-loop, reemite
+            # "leque") - 2026-09-06, achado ao vivo: sem isso, ela ficava
+            # travada pra sempre no último quadro de `flutuando_para_leque`
+            # (fallback `null` no catálogo, sem NENHUM código escolhendo
+            # um dos 3 humores), só saindo do congelamento se o usuário
+            # clicasse manualmente "Ficar Esnobe"/"Ficar Neutra".
+            self._reacao_leque_definida = True
+            self._controller.solicitar_transicao(random.choice(LEQUE_LOOPS))
         if estado == "flutuando" and self._arraste_pendente_finalizacao:
             self._arraste_pendente_finalizacao = False
             self.arraste_finalizado.emit()
@@ -498,7 +573,14 @@ class MascotWindow(QWidget):
         devagar (~8s) tirava ela do tempo real do clipe; a correção foi
         deixar a duração TOTAL como a duração natural do clipe de novo,
         e mexer só na FORMA da queda (parada -> acelera igual gravidade
-        de verdade) em vez de esticar o relógio inteiro."""
+        de verdade) em vez de esticar o relógio inteiro.
+
+        Exceção: `agarrada_para_queda-heroica` desvia pra
+        `_disparar_queda_heroica` - diferente de joelho/bunda (um clipe
+        só, já termina pousada), a queda heroica tem um LOOP entre a
+        introdução e o pouso (`queda-heroica_loop`, repete quantas vezes
+        precisar) - a duração daí em diante escala com a distância real,
+        não com o tamanho de nenhum clipe."""
         if not self._controller.solicitar_transicao(queda_id):
             return
         asset_queda = self._controller.asset_atual
@@ -508,6 +590,11 @@ class MascotWindow(QWidget):
         piso = tela_y + tela_altura - self.height() + margem
         if piso <= self.y():
             return  # já está no chão (ou muito perto) - sem espaço pra cair
+
+        if queda_id == "agarrada_para_queda-heroica":
+            self._disparar_queda_heroica(piso)
+            return
+
         duracao_ms = (asset_queda.frame_count * asset_queda.frame_duration_ms) if asset_queda else 1000
         pausa_ms = min(self.PAUSA_QUEDA_MS, duracao_ms * 0.5)  # nunca mais que metade do clipe, pra clipes curtos não ficarem só pausados
         self._queda_arraste.finalizado.connect(self.salvar_posicao_atual, Qt.ConnectionType.SingleShotConnection)
@@ -517,6 +604,46 @@ class MascotWindow(QWidget):
             (self.x(), piso),
             pausa_ms,
             duracao_ms - pausa_ms,
+        )
+
+    def _disparar_queda_heroica(self, piso: float) -> None:
+        """Duração PROPORCIONAL à distância real até o piso (queda livre:
+        distância = ½·`ACELERACAO_QUEDA_HEROICA_PXS2`·t², resolvendo pra
+        t) - 2026-09-05, pedido do usuário: "ajustar o tempo de queda...
+        p tentar controlar velocidade". Antes, a queda inteira (pausa +
+        aceleração) sempre acabava exatamente quando o clipe de
+        introdução (`agarrada_para_queda-heroica`) terminava (~4s fixos),
+        então uma queda de 100px e uma de 1000px levavam o MESMO tempo -
+        rápida ou lenta demais dependendo de onde ela foi largada. Agora
+        o `queda-heroica_loop` (`interruptible: true`, mesma origem e
+        destino - repete sozinho enquanto nada mais for pedido) cobre o
+        tempo que for preciso.
+
+        A troca pra `queda-heroica_para_pouso` deixa de ser automática
+        assim que o estado entra em "queda-heroica" (ver
+        `_ao_estado_alterado`) - `_pouso_heroico_pendente` suspende esse
+        gatilho enquanto essa função controla a queda, e quem decide a
+        hora certa é `_ao_mover` abaixo: dispara assim que a distância
+        restante até o piso cai abaixo de `MARGEM_QUASE_CHAO_HEROICA_PX`,
+        não importa em qual repetição do loop ela esteja."""
+        distancia = piso - self.y()
+        duracao_queda_ms = max(1.0, ((2 * distancia / self.ACELERACAO_QUEDA_HEROICA_PXS2) ** 0.5) * 1000)
+        pausa_ms = min(self.PAUSA_QUEDA_MS, duracao_queda_ms * 0.5)
+        self._pouso_heroico_pendente = True
+
+        def _ao_mover(x: float, y: float) -> None:
+            self.move(int(x), int(y))
+            if self._pouso_heroico_pendente and (piso - y) <= self.MARGEM_QUASE_CHAO_HEROICA_PX:
+                self._pouso_heroico_pendente = False
+                self._controller.solicitar_transicao("queda-heroica_para_pouso")
+
+        self._queda_arraste.finalizado.connect(self.salvar_posicao_atual, Qt.ConnectionType.SingleShotConnection)
+        self._queda_arraste.iniciar(
+            lambda: (self.x(), self.y()),
+            _ao_mover,
+            (self.x(), piso),
+            pausa_ms,
+            duracao_queda_ms,
         )
 
     def _acomodar_apos_arraste(self) -> None:

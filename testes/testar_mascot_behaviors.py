@@ -25,6 +25,7 @@ app.setQuitOnLastWindowClosed(False)
 
 from mascot import config, platform_windows, state_catalog
 from mascot import behavior_scheduler as behavior_scheduler_module
+from mascot import window as window_module
 from mascot.animation_controller import AnimationController
 from mascot.asset_repository import AssetRepository
 from mascot.behavior_scheduler import BehaviorScheduler
@@ -142,31 +143,66 @@ checar(
     controller.animacao_atual == "flutuando_para_agarrada",
     controller.animacao_atual,
 )
-window._finalizar_fluxo_animado_arraste()
+escolha_original = window_module.random.choice
+window_module.random.choice = lambda opcoes: (
+    "agarrada_para_queda-heroica"
+    if "agarrada_para_queda-heroica" in opcoes
+    else escolha_original(opcoes)
+)
+try:
+    window._finalizar_fluxo_animado_arraste()
+finally:
+    window_module.random.choice = escolha_original
 esperar_carregamento()
 queda_escolhida = controller.animacao_atual
 checar(
-    "soltar cedo corta a introdução e já começa a queda na hora",
-    queda_escolhida in {"arrastada_para_queda-joelho", "arrastada_para_queda-bunda"},
+    "soltar cedo consegue selecionar e iniciar a queda heroica",
+    queda_escolhida == "agarrada_para_queda-heroica",
     queda_escolhida,
 )
 avancar_ate_estavel(repositorio.obter(queda_escolhida).frame_count)
-recuperacao_esperada = (
-    "queda-joelhos_para_flutuando"
-    if queda_escolhida == "arrastada_para_queda-joelho"
-    else "queda-bunda_para_flutuando"
-)
-checar(
-    "queda do arraste encadeia a recuperação correspondente",
-    controller.animacao_atual == recuperacao_esperada,
-    controller.animacao_atual,
-)
-avancar_ate_estavel(repositorio.obter(recuperacao_esperada).frame_count)
+if queda_escolhida == "agarrada_para_queda-heroica":
+    # 2026-09-05: a troca pra pouso deixou de ser instantânea ao entrar em
+    # "queda-heroica" - agora `queda-heroica_loop` cobre o tempo real de
+    # queda (proporcional à distância, ver `MascotWindow._disparar_queda_
+    # heroica`) e só troca quando a posição de verdade chega perto do
+    # piso, daí precisar de `bombear_ate` (tempo real, não frame manual)
+    # em vez de só continuar puxando quadro por quadro. Não dá pra
+    # afirmar que ainda está no loop NESTE ponto exato (a posição de
+    # spawn padrão do teste já nasce perto do piso, dentro da margem de
+    # "quase chegando" - a troca pode já ter acontecido durante o próprio
+    # `esperar_carregamento` de dentro de `avancar_ate_estavel`, que
+    # processa eventos reais enquanto espera) - só o resultado final
+    # importa, não em qual quadro exato a virada acontece.
+    checar(
+        "queda heroica troca pra pouso sozinha ao chegar perto do chão",
+        bombear_ate(lambda: controller.animacao_atual == "queda-heroica_para_pouso", timeout_s=8),
+        controller.animacao_atual,
+    )
+etapas_recuperacao = {
+    "arrastada_para_queda-joelho": ("queda-joelhos_para_flutuando",),
+    "arrastada_para_queda-bunda": ("queda-bunda_para_flutuando",),
+    "agarrada_para_queda-heroica": (
+        "queda-heroica_para_pouso",
+        "pouso-heroico_para_flutuando",
+    ),
+}[queda_escolhida]
+for etapa in etapas_recuperacao:
+    checar(
+        f"queda do arraste encadeia {etapa}",
+        controller.animacao_atual == etapa,
+        controller.animacao_atual,
+    )
+    avancar_ate_estavel(repositorio.obter(etapa).frame_count)
 checar(
     "fluxo do arraste real termina no idle flutuando",
     controller.animacao_atual == "flutuando_idle" and controller.estado_logico == "flutuando",
     (controller.animacao_atual, controller.estado_logico),
 )
+# O teste avança os quadros manualmente muito mais rápido que o relógio real;
+# encerra o deslocamento físico correspondente para ele não disputar a posição
+# com o próximo cenário. No aplicativo ambos terminam sincronizados.
+window._queda_arraste.parar()
 
 window.move(100, 100)
 window._posicao_ao_pressionar = window.pos()
@@ -275,6 +311,70 @@ checar("scheduler libera a trava depois de Levantar terminar", bombear_ate(lambd
 
 
 # ----------------------------------------------------------------------
+# forcar_sentar (2026-09-05, pedido do usuário: "qnd eu mando ela sentar,
+# ela tem q ir ate a barra antes de realizar a animação direto onde
+# esta") - usado pela Gesture Wheel em vez de `solicitar_transicao(
+# "flutuando_para_sentada")` direto - precisa da MESMA jornada até a
+# barra que `_executar_taskbar_sit` já faz, não sentar no ar onde ela
+# estiver.
+# ----------------------------------------------------------------------
+window.move(window.x(), window.y() - 300)  # longe da barra de propósito
+posicao_longe = window.pos()
+aceito_sentar = scheduler.forcar_sentar()
+checar("forcar_sentar() aceito a partir do idle flutuando calmo", aceito_sentar is True)
+checar("forcar_sentar() ocupa o scheduler (mesma jornada do Taskbar Sit)", scheduler._ocupado)
+checar(
+    "forcar_sentar() SAI DO LUGAR até a barra antes de sentar (não senta no ar)",
+    bombear_ate(lambda: window.pos() != posicao_longe, timeout_s=2 * DURACAO_MAX_SALTO_S),
+    (posicao_longe, window.pos()),
+)
+checar(
+    "forcar_sentar() termina em sentada_balancando-pernas",
+    bombear_ate(lambda: controller.animacao_atual == "sentada_balancando-pernas", timeout_s=2 * DURACAO_MAX_SALTO_S),
+    controller.animacao_atual,
+)
+checar("scheduler libera a trava depois de forcar_sentar() terminar", bombear_ate(lambda: not scheduler._ocupado, timeout_s=2))
+checar(
+    "forcar_sentar() RECUSADO se ela já não estiver no idle flutuando calmo (ex.: já sentada)",
+    scheduler.forcar_sentar() is False,
+)
+scheduler._executar_levantar()
+bombear_ate(lambda: controller.animacao_atual == "flutuando_idle" and controller.estado_logico == "flutuando", timeout_s=15)
+
+
+# ----------------------------------------------------------------------
+# Leque (2026-09-06, achado ao vivo: "o ficar esnobe parece q esta sem o
+# final tbm") - `flutuando_para_leque` não tem fallback fixo (3 humores
+# possíveis, precisa sortear) - MESMO padrão de `ARRASTADA_LOOPS`
+# (`MascotWindow._ao_estado_alterado`), só que isso nunca tinha sido
+# implementado de verdade: ela ficava travada pra sempre no último
+# quadro de `flutuando_para_leque`, sem entrar em NENHUM loop de humor
+# sozinha. Achado colateral - o bug de fundo era de ORDEM: `_avancar()`
+# emitia `estado_alterado` ANTES de marcar o timer como parado, então um
+# listener síncrono pedindo uma transição nova (aqui) era sempre
+# rejeitado por engano.
+# ----------------------------------------------------------------------
+LEQUE_LOOPS_VALIDOS = {"leque_ironica_loop", "leque_esnobe_loop", "leque_sorriso_loop"}
+controller.solicitar_transicao("flutuando_para_leque")
+avancar_ate_estavel(repositorio.obter("flutuando_para_leque").frame_count)
+checar(
+    "leque entra sozinha num dos 3 loops de humor (não trava mais no último quadro da intro)",
+    bombear_ate(lambda: controller.animacao_atual in LEQUE_LOOPS_VALIDOS, timeout_s=8),
+    controller.animacao_atual,
+)
+checar("estado_logico correto depois de entrar no leque", controller.estado_logico == "leque", controller.estado_logico)
+
+# "leque" não tem NENHUMA transição de volta pra "flutuando" hoje (achado
+# nesta mesma investigação - só as 3 variações de humor entre si, sem
+# clipe de saída) - `forcar_estado` é o escape hatch documentado pra
+# exatamente esse caso ("use apenas quando não existe uma transição
+# visual compatível"), senão os testes seguintes (Wander, AFK, etc.)
+# ficariam contaminados presos em "leque" pro resto do arquivo.
+controller.forcar_estado("flutuando_idle")
+esperar_carregamento()
+
+
+# ----------------------------------------------------------------------
 # Wander - flutuando numa direção e voltando pro idle, com deslocamento
 # real de posição na tela, EM PARALELO com a animação (não antes/depois
 # dela) - bug real reportado pelo usuário, 2026-08-29.
@@ -289,7 +389,18 @@ checar(
 )
 direcao_escolhida = controller.animacao_atual.removeprefix("flutuando_").removesuffix("_iniciar")
 
-checar("Wander já começa o deslocamento físico no mesmo instante (não espera 'iniciar' terminar)", scheduler._movimento_wander.em_andamento)
+# 2026-09-04 - `_iniciar_hop` passou a carregar os 3 clipes da direção
+# (iniciar/parar/loop) de forma ASSÍNCRONA (achado ao vivo, medido: os 3
+# `obter()` síncronos de antes travavam a UI por ~1,5s quando a direção
+# ainda não estava em cache - "travou na hora de subir"). Se algum dos 3
+# não estiver pré-aquecido, `_movimento_wander.iniciar` só é chamado
+# quando os 3 chegarem - por isso `bombear_ate` aqui também, não mais uma
+# checagem imediata (o ponto do teste - deslocamento em PARALELO com a
+# animação, nunca esperando ela acabar - continua valendo, só a garantia
+# de "no mesmo instante" que dependia do bug antigo (carregar tudo
+# bloqueando) é que não existe mais).
+bombear_ate(lambda: scheduler._movimento_wander.em_andamento, timeout_s=2)
+checar("Wander começa o deslocamento físico sem esperar 'iniciar' terminar de tocar", scheduler._movimento_wander.em_andamento)
 bombear_ate(lambda: not controller.animacao_atual.endswith("_iniciar") or (window.x(), window.y()) != posicao_antes_wander, timeout_s=2)
 checar(
     "janela já se moveu ENQUANTO 'iniciar' ainda está tocando (não espera ele acabar pra sair do lugar)",
@@ -474,32 +585,76 @@ checar(
 )
 
 ociosidade_simulada[0] = 10.0
-scheduler._verificar_afk()
-esperar_carregamento()
+# 🔥 Achado 2026-09-06 (investigando o relato do usuário "os finais tao
+# trocados"): `_iniciar_sono` sorteia entre "sentada_caindo-no-sono" e
+# "sentada_deitando" (`random.choice`), nunca mockado aqui - a asserção
+# abaixo espera especificamente "sentada_caindo-no-sono", então falhava
+# de verdade (não por timing, como eu vinha assumindo) toda vez que o
+# sorteio saía "sentada_deitando". Forçado determinístico só pra este
+# teste, mesmo padrão já usado pra Substituição Ninja (`window_module.
+# random.choice` em testes acima).
+_escolha_original_sono = behavior_scheduler_module.random.choice
+behavior_scheduler_module.random.choice = lambda opcoes: (
+    "sentada_caindo-no-sono" if "sentada_caindo-no-sono" in opcoes else _escolha_original_sono(opcoes)
+)
+try:
+    scheduler._verificar_afk()
+    esperar_carregamento()
+finally:
+    behavior_scheduler_module.random.choice = _escolha_original_sono
 checar(
     "AFK detectado a partir de sentada_balancando-pernas dispara sentada_caindo-no-sono",
     controller.animacao_atual == "sentada_caindo-no-sono" and scheduler._ocupado,
     controller.animacao_atual,
 )
 checar(
-    "termina de dormir de vez (estado_logico == dormindo) e libera a trava",
-    bombear_ate(lambda: controller.estado_logico == "dormindo" and not scheduler._ocupado, timeout_s=15),
+    "termina em uma pose AFK (dormindo ou exausta) e libera a trava",
+    bombear_ate(lambda: controller.estado_logico in {"dormindo", "deitada"} and not scheduler._ocupado, timeout_s=15),
     (controller.estado_logico, controller.animacao_atual),
 )
+
+estado_afk_inicial = controller.estado_logico
+scheduler._proxima_variacao_sono_em = 0.0
+scheduler._verificar_afk()
+esperar_carregamento()
+transicao_sono_esperada = (
+    "dormindo_para_exausta" if estado_afk_inicial == "dormindo" else "dormindo_trocando-lado"
+)
+checar(
+    "enquanto AFK alterna entre dormindo e exausta sem passar por sentada",
+    controller.animacao_atual == transicao_sono_esperada
+    and controller.estado_logico == estado_afk_inicial
+    and scheduler._ocupado,
+    (controller.animacao_atual, controller.estado_logico),
+)
+checar(
+    "variação AFK termina na outra pose deitada",
+    bombear_ate(
+        lambda: controller.estado_logico in {"dormindo", "deitada"}
+        and controller.estado_logico != estado_afk_inicial
+        and not scheduler._ocupado,
+        timeout_s=15,
+    ),
+    (controller.estado_logico, controller.animacao_atual),
+)
+
+estado_antes_de_acordar = controller.estado_logico
 
 ociosidade_simulada[0] = 0.5
 scheduler._verificar_afk()
 esperar_carregamento()
 checar(
-    "usuário volta (ociosidade cai) - reage na hora com uma ação de acordar (transição suave, não corte seco)",
-    controller.animacao_atual in behavior_scheduler_module.REACOES_ACORDAR
-    and controller.estado_logico == "sentada"
+    "usuário volta (ociosidade cai) - usa a transição própria da pose atual",
+    controller.animacao_atual == (
+        "dormindo_para_sentada" if estado_antes_de_acordar == "dormindo" else "exausta_para_sentada"
+    )
+    and controller.estado_logico == estado_antes_de_acordar
     and scheduler._ocupado,
     (controller.animacao_atual, controller.estado_logico),
 )
 checar(
-    "a ação de acordar termina de volta em sentada_balancando-pernas e libera a trava",
-    bombear_ate(lambda: controller.animacao_atual == "sentada_balancando-pernas" and not scheduler._ocupado, timeout_s=10),
+    "a transição de levantar termina em sentada_balancando-pernas e libera a trava",
+    bombear_ate(lambda: controller.animacao_atual == "sentada_balancando-pernas" and not scheduler._ocupado, timeout_s=15),
     (controller.animacao_atual, scheduler._ocupado),
 )
 

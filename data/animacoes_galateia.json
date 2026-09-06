@@ -451,7 +451,7 @@
       "state": {
         "origin": "flutuando",
         "destination": "brinde",
-        "fallback": null,
+        "fallback": "brinde_para_flutuando",
         "interruptible": false,
         "tags": [
           "transition",
@@ -517,13 +517,13 @@
       "assetType": "scene"
     },
     {
-      "id": "leque_esnobe_para_neutra",
+      "id": "leque-esnobe_para_neutra",
       "source": "E:\\Downloads\\Sprites\\Leque-Esnobe_Leque.mp4",
       "loop": false,
       "state": {
-        "origin": "leque",
+        "origin": "leque-esnobe",
         "destination": "leque",
-        "fallback": null,
+        "fallback": "leque_esnobe_loop",
         "interruptible": false,
         "tags": [
           "transition",
@@ -573,8 +573,8 @@
       "loop": false,
       "state": {
         "origin": "leque",
-        "destination": "leque",
-        "fallback": "leque_esnobe_loop",
+        "destination": "leque-esnobe",
+        "fallback": "leque-esnobe_para_neutra",
         "interruptible": false,
         "tags": [
           "transition",
@@ -616,7 +616,8 @@
           "heroic",
           "floating"
         ],
-        "inferred": false
+        "inferred": false,
+        "speedMultiplier": 1.992
       }
     },
     {
@@ -651,7 +652,8 @@
           "landing",
           "heroic"
         ],
-        "inferred": false
+        "inferred": false,
+        "speedMultiplier": 1.992
       }
     },
     {
@@ -669,7 +671,8 @@
           "ninja",
           "floating"
         ],
-        "inferred": false
+        "inferred": false,
+        "speedMultiplier": 1.4
       },
       "assetType": "scene"
     },
@@ -691,6 +694,59 @@
         "inferred": false
       },
       "assetType": "scene"
+    },
+    {
+      "id": "dormindo_para_sentada",
+      "source": "E:\\Downloads\\Sprites\\dormindo_para_sentada.mp4",
+      "loop": false,
+      "state": {
+        "origin": "dormindo",
+        "destination": "sentada",
+        "fallback": "sentada_balancando-pernas",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "sleep",
+          "wakeup"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "exausta_para_sentada",
+      "source": "E:\\Downloads\\Sprites\\exausta_para_sentada.mp4",
+      "loop": false,
+      "state": {
+        "origin": "deitada",
+        "destination": "sentada",
+        "fallback": "sentada_balancando-pernas",
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "sleep",
+          "wakeup",
+          "exhausted"
+        ],
+        "inferred": false
+      }
+    },
+    {
+      "id": "dormindo_para_exausta",
+      "source": "E:\\Downloads\\Sprites\\Gaia\\dormindo_trocando-lado.mp4",
+      "loop": false,
+      "state": {
+        "origin": "dormindo",
+        "destination": "deitada",
+        "fallback": null,
+        "interruptible": false,
+        "tags": [
+          "transition",
+          "sleep",
+          "exhausted"
+        ],
+        "inferred": false
+      },
+      "reverse": true
     }
   ]
 }

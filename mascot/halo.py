@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Halo (brilho auxiliar) ao redor da personagem - Project LOKI Fase 5
-(`Project LOKI.md`, seção 5.2). SEM asset novo de propósito - a Galateia é
+"""Halo (brilho auxiliar) ao redor da personagem. SEM asset novo de propósito - a Galateia é
 100% vídeo/animação pré-renderizada (não um rig ao vivo tipo VTube Studio),
 e gerar uma variação de CADA clipe pra CADA cor de halo não escala. O halo
 é pintado por cima do quadro atual (`QPainter`, gradiente radial), a mesma

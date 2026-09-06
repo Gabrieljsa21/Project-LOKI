@@ -88,13 +88,25 @@ checar(
     controller.animacao_atual,
 )
 window._finalizar_fluxo_animado_arraste()
-# soltar dispara UMA das duas quedas (sorteada) + a recuperação dela -
-# avança o bastante pras duas terminarem, não importa qual foi sorteada
+# soltar dispara uma das quedas (sorteada); avança manualmente só o
+# bastante pra passar da introdução de QUALQUER uma das 3 (rápido,
+# determinístico). Dali em diante, a heroica passou a decidir a troca
+# pro pouso pela posição REAL (`MascotWindow._disparar_queda_heroica`,
+# 2026-09-05) - não dá mais pra prever quantos quadros faltam só
+# somando frame_count, precisa deixar o tempo de verdade passar
+# (`bombear_ate`, mesmo raciocínio de `testar_mascot_behaviors.py`).
 avancar_ate_estavel(
-    max(repositorio.obter("arrastada_para_queda-joelho").frame_count, repositorio.obter("arrastada_para_queda-bunda").frame_count)
-    + max(repositorio.obter("queda-joelhos_para_flutuando").frame_count, repositorio.obter("queda-bunda_para_flutuando").frame_count)
+    max(
+        repositorio.obter("arrastada_para_queda-joelho").frame_count,
+        repositorio.obter("arrastada_para_queda-bunda").frame_count,
+        repositorio.obter("agarrada_para_queda-heroica").frame_count,
+    )
 )
-checar("volta a flutuar depois do arraste normal (fim do teste anterior)", controller.estado_logico == "flutuando", controller.estado_logico)
+checar(
+    "volta a flutuar depois do arraste normal (fim do teste anterior)",
+    bombear_ate(lambda: controller.estado_logico == "flutuando", timeout_s=15),
+    controller.estado_logico,
+)
 
 # ----------------------------------------------------------------------
 # CHANCE_SUBSTITUICAO_NINJA = 1.0 - força a substituição ninja pra testar
@@ -209,10 +221,18 @@ checar(
     distancia2 >= MascotWindow.DISTANCIA_MINIMA_TELEPORTE_PX ** 2,
     distancia2 ** 0.5,
 )
+_multiplicador_clipe2 = state_catalog.CATALOGO["substituicao-ninja_para_flutuando"].velocidade_multiplicador
+_duracao_esperada_clipe2_ms = max(
+    1, round(repositorio.obter("substituicao-ninja_para_flutuando").frame_duration_ms / _multiplicador_clipe2)
+)
 checar(
-    "o 2º clipe (o 'reaparecer') toca NORMAL - só o 1º é acelerado, pedido do usuário",
-    controller._timer.interval() == repositorio.obter("substituicao-ninja_para_flutuando").frame_duration_ms,
-    (controller._timer.interval(), repositorio.obter("substituicao-ninja_para_flutuando").frame_duration_ms),
+    # 2026-09-05: 2º clipe ganhou seu próprio acelerador (pedido do
+    # usuário: "aumenta a velocidade da segunda parte da substituicao
+    # ninja, uns 40%") - antes tocava normal de propósito, agora também é
+    # declarativo (`speedMultiplier`), igual o 1º.
+    "o 2º clipe (o 'reaparecer') toca no ritmo acelerado calculado (+40%, pedido do usuário)",
+    controller._timer.interval() == _duracao_esperada_clipe2_ms,
+    (controller._timer.interval(), _duracao_esperada_clipe2_ms),
 )
 
 # termina o 2º clipe - deve encadear sozinho pro flutuando_idle e liberar

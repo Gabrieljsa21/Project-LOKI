@@ -133,6 +133,11 @@ Cada animação pronta contém apenas `spritesheet.webp` e `animation.json`. A o
 `--preview` acrescenta um `preview.webp` animado para conferência; ele pode ser apagado
 depois e não é necessário durante a execução da Galateia.
 
+O fluxo automatizado também atualiza a miniatura quando a animação estiver
+selecionada na Gesture Wheel. Movimentos continuam representados por setas e
+ações removidas da roda são ignoradas. Imagens escolhidas manualmente no painel
+nunca são substituídas pelo gerador automático.
+
 ## Testar e visualizar
 
 Dê dois cliques em `TESTAR_ANIMACOES.bat`, na pasta `assistant`. O visualizador

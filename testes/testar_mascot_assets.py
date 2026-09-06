@@ -2,7 +2,7 @@
 `state_catalog`, `AnimationController`) - sem framework de teste (mesmo
 padrão de testes/testar_*.py), roda cada caso e imprime PASS/FAIL.
 
-Critério de aceite da Fase 0 (`C:\\Workspace\\Project LOKI.md`, seção 13):
+Critério de aceite (ver `ARQUITETURA.md`, "Contrato de asset"):
 reproduz os assets finais diretamente (não usa fontes de `E:\\Downloads`
 nem `preview.webp`), mantém pivô, cai em fallback sem crash pra asset
 ausente/inválido/incompatível, e transições respeitam o grafo de estados.
@@ -247,15 +247,24 @@ checar(
 )
 
 controller_pinados = AnimationController(repositorio=repositorio_real)
+# 2026-09-04, achado ao vivo: "ela trava ate p sentar. E no inicio do
+# projeto... ela rodava lisa" - só a TRANSIÇÃO de entrada (ex.:
+# `flutuando_para_sentada`) era pinada; o loop de repouso que toca DEPOIS
+# dela (`sentada_balancando-pernas`/`sentada_pensando`, e as 3 variantes de
+# `leque`) não era, então podia ser despejado e recarregar (travando) cada
+# vez. `flutuando_para_leque` também entrou (mesma categoria imediata de
+# movimento/arraste/sentar, só faltava por descuido).
 pinados_esperados = {
     "flutuando_direita_iniciar", "flutuando_esquerda_iniciar",
     "flutuando_subida_iniciar", "flutuando_descida_iniciar",
     "flutuando_superior-direita_iniciar", "flutuando_superior-esquerda_iniciar",
     "flutuando_inferior-direita_iniciar", "flutuando_inferior-esquerda_iniciar",
-    "flutuando_para_agarrada", "flutuando_para_sentada",
+    "flutuando_para_agarrada", "flutuando_para_sentada", "flutuando_para_leque",
+    "flutuando_idle", "sentada_balancando-pernas", "sentada_pensando",
+    "leque_ironica_loop", "leque_esnobe_loop", "leque_sorriso_loop",
 }
 checar(
-    "AnimationController fixa os 10 clipes de entrada de movimento/arraste (tag 'transition' a partir do idle)",
+    "AnimationController fixa os clipes de entrada de movimento/arraste/leque MAIS os loops de repouso (tag 'idle')",
     controller_pinados._computar_pinados() == frozenset(pinados_esperados),
     sorted(controller_pinados._computar_pinados()),
 )
@@ -268,9 +277,18 @@ checar(
     repositorio_real._pinados == frozenset(pinados_esperados),
     sorted(repositorio_real._pinados),
 )
-bombear_ate(lambda: all(repositorio_real.esta_em_cache(p) for p in pinados_esperados))
+bombear_ate(
+    lambda: all(repositorio_real.esta_em_cache(p) for p in pinados_esperados),
+    # 15s (2026-09-04, achado ao vivo: "ela trava ate p sentar... antes ela
+    # rodava lisa") - com os loops de repouso de sentada/leque agora
+    # também pinados (achado acima), a fila de pré-carregamento na largada
+    # cresceu e MAX_THREADS_PRELOAD é 1 (estritamente serial) - medido ao
+    # vivo: ~11s pra esquentar tudo. Ainda em segundo plano, não bloqueia
+    # nada visível - só o teste precisa de mais paciência que o padrão de 5s.
+    timeout_s=15,
+)
 checar(
-    "os 10 pinados esquentam no cache pelo preload de cold-start (sem esperar uma transição real)",
+    "todos os pinados esquentam no cache pelo preload de cold-start (sem esperar uma transição real)",
     all(repositorio_real.esta_em_cache(p) for p in pinados_esperados),
     [p for p in pinados_esperados if not repositorio_real.esta_em_cache(p)],
 )
@@ -424,6 +442,57 @@ checar(
     (controller_caos.animacao_atual, controller_caos.estado_logico),
 )
 
+# Mesmo bug do caos acima, achado 2026-09-06 ("A animação de brinde esta
+# travando qnd clico pelas ações") - `flutuando_para_brinde` também tinha
+# `fallback: null` (o fix do caos, 2026-09-02, não cobriu esta - ficou
+# esquecida com o mesmo problema). Corrigido igual: `fallback:
+# "brinde_para_flutuando"` em `data/animacoes_galateia.json`.
+controller_brinde = AnimationController(repositorio=repositorio_real)
+aceitou_brinde = transicionar(controller_brinde, "flutuando_para_brinde")
+checar("'brinde' é aceita a partir do idle flutuando", aceitou_brinde, controller_brinde.animacao_atual)
+avancar_ate_estavel(
+    controller_brinde,
+    repositorio_real.obter("flutuando_para_brinde").frame_count
+    + repositorio_real.obter("brinde_para_flutuando").frame_count,
+)
+checar(
+    "'brinde' encadeia sozinha (fallback) até flutuando_idle, nunca mais trava",
+    controller_brinde.animacao_atual == "flutuando_idle" and controller_brinde.estado_logico == "flutuando",
+    (controller_brinde.animacao_atual, controller_brinde.estado_logico),
+)
+
+# "Ficar Esnobe"/"Ficar Neutra" (leque) - achado 2026-09-06, usuário com o
+# print da roda: "o ficar esnobe parece q esta sem o final tbm" -> "a
+# animação na posicao 29 - Ficar Neutra, parece ser o final da 32" -
+# `leque_neutra_para_esnobe` (destino "leque", igual sua própria origem)
+# era tratada como AÇÃO simples pelo `AnimationController._avancar`
+# (`estado_origem == estado_destino`), que SEMPRE volta pro último loop
+# tocando antes, ignorando qualquer fallback declarado - `leque_esnobe_
+# para_neutra` (a pose de conexão certa, confirmada visualmente batendo
+# frame a frame com o fim de "Ficar Esnobe") nunca era alcançada
+# automaticamente. Corrigido dando um DESTINO PRÓPRIO ("leque-esnobe") a
+# "Ficar Esnobe" - deixa de ser "ação" (destino != origem), respeitando o
+# fallback de verdade; o antigo `leque_esnobe_para_neutra` renomeado pra
+# `leque-esnobe_para_neutra` (origem "leque-esnobe", mesma convenção de
+# nomes hifenizados pra estados compostos) fecha a volta pro "leque"
+# normal, terminando em `leque_esnobe_loop`.
+controller_leque = AnimationController(repositorio=repositorio_real)
+controller_leque.forcar_estado("leque_ironica_loop")  # entra direto num humor - a entrada em si já é testada em testar_mascot_behaviors.py
+aceitou_esnobe = transicionar(controller_leque, "leque_neutra_para_esnobe")
+checar("'Ficar Esnobe' é aceita a partir de um humor do leque", aceitou_esnobe, controller_leque.animacao_atual)
+avancar_ate_estavel(controller_leque, repositorio_real.obter("leque_neutra_para_esnobe").frame_count)
+checar(
+    "'Ficar Esnobe' encadeia sozinha pra 'Ficar Neutra' (não pula pro loop anterior)",
+    controller_leque.animacao_atual == "leque-esnobe_para_neutra" and controller_leque.estado_logico == "leque-esnobe",
+    (controller_leque.animacao_atual, controller_leque.estado_logico),
+)
+avancar_ate_estavel(controller_leque, repositorio_real.obter("leque-esnobe_para_neutra").frame_count)
+checar(
+    "'Ficar Neutra' termina no loop esnobe, de volta ao estado 'leque'",
+    controller_leque.animacao_atual == "leque_esnobe_loop" and controller_leque.estado_logico == "leque",
+    (controller_leque.animacao_atual, controller_leque.estado_logico),
+)
+
 
 # ----------------------------------------------------------------------
 # Fluxo direcional completo: iniciar -> loop -> parar -> idle.
@@ -516,17 +585,65 @@ checar(
 
 
 # Poses finais de sono não devem teleportar de volta ao idle sentado.
+# 2026-09-06: destino de `sentada_deitando`/`sentada_caindo-no-sono`
+# invertido (achado ao vivo: "os finais tao trocados") - "deitando" agora
+# é quem leva pra "dormindo" e "caindo no sono" leva pra "deitada"
+# (exausta); os dois testes abaixo trocaram de clipe de entrada pra
+# continuar cobrindo os MESMOS dois caminhos (dormindo/wakeup direto vs.
+# deitada/trocar de lado/wakeup exausta), sem mudar mais nada.
 controller_sono = AnimationController(repositorio=repositorio_real)
 transicionar(controller_sono, "flutuando_para_sentada")
 avancar_ate_estavel(controller_sono, repositorio_real.obter("flutuando_para_sentada").frame_count)
-transicionar(controller_sono, "sentada_caindo-no-sono")
-avancar_ate_estavel(controller_sono, repositorio_real.obter("sentada_caindo-no-sono").frame_count)
+transicionar(controller_sono, "sentada_deitando")
+avancar_ate_estavel(controller_sono, repositorio_real.obter("sentada_deitando").frame_count)
 checar(
-    "caindo no sono segura o quadro final no estado dormindo",
-    controller_sono.animacao_atual == "sentada_caindo-no-sono"
+    "deitando segura o quadro final no estado dormindo",
+    controller_sono.animacao_atual == "sentada_deitando"
     and controller_sono.estado_logico == "dormindo"
     and not controller_sono._timer.isActive(),
     (controller_sono.animacao_atual, controller_sono.estado_logico),
+)
+
+transicionar(controller_sono, "dormindo_para_sentada")
+avancar_ate_estavel(controller_sono, repositorio_real.obter("dormindo_para_sentada").frame_count)
+checar(
+    "acordar dormindo retorna ao idle sentado",
+    controller_sono.animacao_atual == "sentada_balancando-pernas"
+    and controller_sono.estado_logico == "sentada",
+    (controller_sono.animacao_atual, controller_sono.estado_logico),
+)
+
+controller_exausta = AnimationController(repositorio=repositorio_real)
+transicionar(controller_exausta, "flutuando_para_sentada")
+avancar_ate_estavel(controller_exausta, repositorio_real.obter("flutuando_para_sentada").frame_count)
+transicionar(controller_exausta, "sentada_caindo-no-sono")
+avancar_ate_estavel(controller_exausta, repositorio_real.obter("sentada_caindo-no-sono").frame_count)
+checar(
+    "caindo no sono segura a pose exausta (deitada) final",
+    controller_exausta.estado_logico == "deitada" and not controller_exausta._timer.isActive(),
+    (controller_exausta.animacao_atual, controller_exausta.estado_logico),
+)
+transicionar(controller_exausta, "dormindo_trocando-lado")
+avancar_ate_estavel(controller_exausta, repositorio_real.obter("dormindo_trocando-lado").frame_count)
+checar(
+    "trocar de lado conecta a pose exausta à pose dormindo",
+    controller_exausta.estado_logico == "dormindo" and not controller_exausta._timer.isActive(),
+    (controller_exausta.animacao_atual, controller_exausta.estado_logico),
+)
+transicionar(controller_exausta, "dormindo_para_exausta")
+avancar_ate_estavel(controller_exausta, repositorio_real.obter("dormindo_para_exausta").frame_count)
+checar(
+    "trocar de lado ao contrário retorna de dormindo para exausta",
+    controller_exausta.estado_logico == "deitada" and not controller_exausta._timer.isActive(),
+    (controller_exausta.animacao_atual, controller_exausta.estado_logico),
+)
+transicionar(controller_exausta, "exausta_para_sentada")
+avancar_ate_estavel(controller_exausta, repositorio_real.obter("exausta_para_sentada").frame_count)
+checar(
+    "levantar exausta retorna ao idle sentado",
+    controller_exausta.animacao_atual == "sentada_balancando-pernas"
+    and controller_exausta.estado_logico == "sentada",
+    (controller_exausta.animacao_atual, controller_exausta.estado_logico),
 )
 
 
