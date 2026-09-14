@@ -10,8 +10,7 @@ argv - ver `integrations/mascot/supervisor.py`) ligam o `MascotBridgeServer`
 se estiverem presentes; sem elas, roda em "modo demonstração" sozinho
 (plano, seção 2: "funcione em modo demonstração sem iniciar a GAIA") -
 é assim que rodei manualmente o tempo todo até aqui. A bandeja do sistema
-continua sendo o playground ("forçar clipe e sequência") até o
-CompanionPanel existir.
+continua sendo o playground ("forçar clipe e sequência").
 """
 from __future__ import annotations
 
@@ -96,7 +95,8 @@ from mascot.animation_controller import AnimationController
 from mascot.asset_repository import AssetRepository
 from mascot.behavior_scheduler import BehaviorScheduler
 from mascot.click_destino import ClickDestinoWatcher
-from mascot.companion_panel import CompanionPanel
+from mascot.conversation_service import ConversationService
+from mascot.conversation_overlay.conversation_controller import ConversationController
 from mascot.menu_sao import MenuSAO
 from mascot.protocol.server import MascotBridgeServer
 from mascot.qt_widgets import confirmar_acao
@@ -129,6 +129,12 @@ class MascotApp:
         self.config_mascot = config.carregar_config_mascot()
         self.config_behaviors = config.carregar_config_behaviors()
         self._modal_configuracoes = None  # instância única, ver _abrir_configuracoes
+        self.playback_state = {}
+
+        from mascot.playback_events import ReceptorPlayback
+        self.playback_receiver = ReceptorPlayback()
+        self.playback_receiver.evento_recebido.connect(self._ao_evento_siren)
+        self.playback_receiver.iniciar()
 
         self.repositorio = AssetRepository(orcamento_mb=self.config_mascot["memoria_orcamento_mb"])
         self.controller = AnimationController(repositorio=self.repositorio)
@@ -155,13 +161,30 @@ class MascotApp:
         self.click_destino = self._montar_click_destino()
         self.tray = self._montar_tray()
 
-        # 🔥 CompanionPanel (Fase 4 MVP, 2026-09-01) - `bridge_provider` é um
-        # lambda (não a referência direta) porque `self.bridge` só é
-        # atribuído mais abaixo (`_montar_bridge`, pode até ficar `None` em
-        # modo demonstração) - o lambda sempre lê o valor ATUAL no momento
-        # de enviar, nunca uma cópia antiga.
-        self.companion_panel = CompanionPanel(self.window, lambda: self.bridge, self.safety)
-        self.window.clicada.connect(self.companion_panel.alternar_visibilidade_solicitado.emit)
+        # O CompanionPanel visual foi removido definitivamente do runtime em
+        # 2026-09-07. Ele já não era exibido desde que o histórico passou a
+        # usar os próprios bubbles, mas ainda era construído escondido e por
+        # isso ganhava um HWND nativo (a origem da janela branca "Galateia").
+        # As duas responsabilidades restantes vivem agora neste QObject sem
+        # janela: envio pelo bridge e estado do modo de voz do Menu SAO.
+        self.conversation_service = ConversationService(lambda: self.bridge)
+        # Alias apenas para consumidores cross-repo ainda na nomenclatura
+        # antiga. O objeto apontado aqui não é QWidget e não pode abrir janela.
+        self.companion_panel = self.conversation_service
+
+        # 🔥 Conversation Overlay / "Bubble Mode" (2026-09-06, pedido do
+        # usuário: "a conversa deve acontecer diretamente ao redor da
+        # GAIA... não abrir mais um painel de chat grande por padrão") -
+        # substitui o CompanionPanel como destino do clique direto na GAIA/
+        # hotkey global/"Conversar" do Menu SAO. `texto_enviado` reaproveita
+        # o MESMO envio do painel (`enviar_mensagem`, extraído 2026-09-06)
+        # - só o ENVIO de verdade (bridge), o histórico visual agora vive
+        # inteiramente no `BubbleStack` (2026-09-07).
+        self.conversation = ConversationController(self.window, self.safety)
+        self.window.clicada.connect(self.conversation.alternar)
+        self.conversation.texto_enviado.connect(self.conversation_service.enviar_mensagem)
+        self.conversation_service.falha_envio.connect(self.conversation.receber_erro)
+        self.window.arraste_iniciado.connect(self.conversation.fechar_imediato)
         self._registrar_hotkey_companion_panel()
 
         # 🔥 Menu SAO (2026-09-02, `GAIA_MENU_SAO.md`) - camada ADICIONAL,
@@ -171,9 +194,10 @@ class MascotApp:
         # está com a mão nela), mesmo sinal que já interrompe física/Wander
         # (`scheduler.interromper_para_arraste`, acima).
         self.menu_sao = MenuSAO(
-            self.window, self.safety, self.companion_panel,
+            self.window, self.safety, self.conversation_service,
             controller=self.controller, mascot_app=self,
             estilo_id=self.config_mascot.get("menu_sao_estilo", "vidro"),
+            conversation=self.conversation,
         )
         self.window.scroll_baixo_confirmado.connect(self.menu_sao.abrir)
         self.window.scroll_cima_confirmado.connect(self.menu_sao.fechar)
@@ -183,14 +207,29 @@ class MascotApp:
 
         self.window.show()
 
+    def _ao_evento_siren(self, evento):
+        """Mantém estado visual-consumível sem acoplar o LOKI ao MPV."""
+        tipo = evento.get("type")
+        if tipo == "track_ended":
+            self.playback_state = {"playing": False, **evento}
+        elif tipo == "playback_paused":
+            self.playback_state.update(evento)
+            self.playback_state["playing"] = False
+        else:
+            self.playback_state.update(evento)
+            if tipo in {"track_started", "playback_resumed", "progress"}:
+                self.playback_state["playing"] = True
+
     def _registrar_hotkey_companion_panel(self) -> None:
         """Hotkey global registrado DIRETO neste subprocesso (lib `keyboard`,
         mesma já usada em `run.py`/no antigo `vtuber_overlay.py`) - funciona
         mesmo em modo demonstração, sem GAIA rodando. O callback do
         `keyboard` roda numa thread PRÓPRIA da lib, nunca na do Qt - por
-        isso emite `alternar_visibilidade_solicitado` (sinal, thread-safe)
-        em vez de chamar `alternar_visibilidade()` direto (ver docstring do
-        sinal em `companion_panel.py`)."""
+        isso emite `alternar_solicitado` (sinal, thread-safe) em vez de
+        chamar `alternar()` direto (ver docstring do sinal em
+        `conversation_controller.py`; MESMO nome de método herdado do
+        antigo `companion_panel.alternar_visibilidade_solicitado`, agora
+        reponta pro Conversation Overlay - 2026-09-06)."""
         atalho = self.config_mascot.get("companion_panel_shortcut")
         if not atalho:
             return
@@ -202,13 +241,13 @@ class MascotApp:
             # do sistema inteiro pra trás sem limpar.
             return
         try:
-            keyboard.add_hotkey(atalho, self.companion_panel.alternar_visibilidade_solicitado.emit)
+            keyboard.add_hotkey(atalho, self.conversation.alternar_solicitado.emit)
         except Exception as e:
             # 🔥 Falha isolada (plano, seção 4, princípio 6) - um atalho
             # inválido/conflitante nunca deve impedir o resto do Mascot de
-            # subir; ainda dá pra abrir o CompanionPanel clicando na
-            # personagem.
-            print(f" [LOKI] Não consegui registrar o atalho do CompanionPanel ({atalho}): {e}")
+            # subir; ainda dá pra abrir a conversa clicando direto na
+            # personagem ou pelo Menu SAO ("Conversar").
+            print(f" [LOKI] Não consegui registrar o atalho da conversa ({atalho}): {e}")
 
     def _montar_click_destino(self) -> ClickDestinoWatcher | None:
         """"Ir até aqui" (pedido do usuário, 2026-08-29) - padrão Alt +
@@ -277,15 +316,22 @@ class MascotApp:
             estado = mensagem.get("state")
             if estado in mascot_events.ESTADOS_SEMANTICOS_VALIDOS:
                 self.estados.definir_estado_semantico(estado)
+                # Conversation Overlay (2026-09-06) - MESMO evento, além do
+                # `StateController` acima (que decide animação); mostra o
+                # indicador de voz "Te ouvindo.../Deixa comigo..." (doc,
+                # seção 8) sem duplicar nenhum protocolo novo.
+                self.conversation.notificar_estado_semantico(estado)
         elif tipo == "voice_mode_changed":
             # 🔥 Halo (Fase 5, redesenhado 2026-09-02 - ver docstring de
             # `mascot/halo.py`) - reflete o modo de voz atual, não
             # mais estado semântico/emoção.
             self.window.definir_halo_modo_voz(mensagem.get("modo"))
         elif tipo == "assistant_message":
-            self.companion_panel.receber_resposta(mensagem)
+            self.conversation_service.receber_resposta(mensagem)
+            self.conversation.receber_resposta(mensagem.get("text", ""))
         elif tipo == "user_message":
-            self.companion_panel.receber_mensagem_usuario(mensagem)
+            self.conversation_service.receber_mensagem_usuario(mensagem)
+            self.conversation.receber_mensagem_usuario_externa(mensagem.get("text", ""))
         elif tipo == "settings_requested":
             # GAIA -> Mascot (botão "🧚 Mascot (LOKI)" do Painel, 2026-09-03) -
             # o modal de configurações agora é NATIVO daqui (`modal_
@@ -475,6 +521,7 @@ def main() -> int:
     from mascot.qt_widgets import aplicar_estilo_global
     aplicar_estilo_global(app)
     mascot_app = MascotApp()  # referência precisa sobreviver ao app.exec() (senão o GC recolhe tudo)
+    app.aboutToQuit.connect(mascot_app.playback_receiver.encerrar)
     _watchdog = _instalar_watchdog_travada(app)  # referência precisa sobreviver junto (mesmo motivo)
     return app.exec()
 

@@ -21,6 +21,11 @@ data/mascot.log
 # Relatórios/cache gerados pelo pipeline de animações
 cache/
 
+# Scratch/staging (entrada bruta do pipeline de animações, saída de
+# geração de imagem) - nunca conteúdo final do repo
+.tmp/
+output/
+
 # Editores / SO
 .vscode/
 .idea/

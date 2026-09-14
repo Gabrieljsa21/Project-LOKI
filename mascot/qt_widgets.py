@@ -12,7 +12,7 @@ clicável) que continuam de fora por não serem necessários aqui - zero
 dependência de GAIA em nada abaixo.
 
 Cópia deliberada, não import cruzando repositórios (mesmo raciocínio de
-`core/mascot_events.py`, ver `ARQUITETURA.md`) - se o original mudar uma
+`core/mascot_events.py`, ver `docs/ARQUITETURA.md`) - se o original mudar uma
 regra de estilo que também vale aqui, replicar manualmente."""
 import os
 

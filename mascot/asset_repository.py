@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Contrato de carregamento de animações do LOKI/Mascot (ver `ARQUITETURA.md`,
+"""Contrato de carregamento de animações do LOKI/Mascot (ver `docs/ARQUITETURA.md`,
 "Contrato de asset") - único ponto que sabe ler
 `assets/galateia/animations/`. Descobre os assets existentes dinamicamente;
 o catálogo de estados decide quais deles podem ser pedidos pelo runtime.

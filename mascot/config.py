@@ -20,6 +20,7 @@ MASCOT_PADRAO = {
     "click_through_when_idle": False,
     "reduce_motion": False,
     "pause_in_fullscreen": True,
+    "proteger_de_captura": False,
     "opacity": 1.0,
     "scale": 1.0,
     # Lista de QScreen.name() (ex.: "Hailstorm", "25UM58G") - vazia = todos

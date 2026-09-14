@@ -2,7 +2,7 @@
 `state_catalog`, `AnimationController`) - sem framework de teste (mesmo
 padrão de testes/testar_*.py), roda cada caso e imprime PASS/FAIL.
 
-Critério de aceite (ver `ARQUITETURA.md`, "Contrato de asset"):
+Critério de aceite (ver `docs/ARQUITETURA.md`, "Contrato de asset"):
 reproduz os assets finais diretamente (não usa fontes de `E:\\Downloads`
 nem `preview.webp`), mantém pivô, cai em fallback sem crash pra asset
 ausente/inválido/incompatível, e transições respeitam o grafo de estados.
