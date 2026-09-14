@@ -19,9 +19,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raiz do projeto
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QWheelEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 app = QApplication.instance() or QApplication([])
 app.setQuitOnLastWindowClosed(False)
@@ -150,6 +150,17 @@ from mascot import process_main
 mascot_app = process_main.MascotApp()
 menu = mascot_app.menu_sao
 
+checar(
+    "serviço de conversa é QObject sem janela, nunca um QWidget/CompanionPanel oculto",
+    isinstance(mascot_app.conversation_service, QObject)
+    and not isinstance(mascot_app.conversation_service, QWidget),
+)
+checar(
+    "runtime não cria nenhuma janela top-level intitulada 'Galateia'",
+    all(widget.windowTitle() != "Galateia" for widget in QApplication.topLevelWidgets()),
+    [widget.windowTitle() for widget in QApplication.topLevelWidgets()],
+)
+
 checar("menu_sao existe e começa fechado", menu is not None and menu._estado == "closed")
 checar("autonomia permitida antes de abrir o menu", mascot_app.safety.autonomia_permitida is True)
 
@@ -217,23 +228,65 @@ checar("trocar de círculo (leave do 1º + enter do 2º) recolhe o antigo e expa
 segundo_circulo.leaveEvent(None)
 bombear(0.5)
 
-visivel_antes = mascot_app.companion_panel.isVisible()
+# "Conversar" (corrigido 2026-09-06) - deixou de abrir o CompanionPanel
+# direto; abre o Conversation Overlay ("Bubble Mode", `conversation_
+# overlay/`) - o painel tradicional só entra via "Ver completo"/"Expandir".
+checar("serviço de conversa permanece sem representação visual", not isinstance(mascot_app.companion_panel, QWidget))
 menu._ao_clicar("conversar")
-checar("clicar 'Conversar' alterna o CompanionPanel (redundante de propósito com o clique direto)", mascot_app.companion_panel.isVisible() != visivel_antes)
+checar("clicar 'Conversar' ativa o Conversation Overlay (Bubble Mode)", mascot_app.conversation.esta_ativo and mascot_app.conversation._input.isVisible())
+checar("'Conversar' não cria o painel tradicional", all(widget.windowTitle() != "Galateia" for widget in QApplication.topLevelWidgets()))
 checar("qualquer clique fecha o menu", menu._estado in ("closing", "closed"))
-checar("CompanionPanel sozinho (motivo próprio) já segura o bloqueio mesmo com o menu fechando", mascot_app.safety.autonomia_permitida is False)
+checar("Conversation Overlay sozinho (motivo próprio) já segura o bloqueio mesmo com o menu fechando", mascot_app.safety.autonomia_permitida is False)
 bombear(1.0)
 checar("menu terminou de fechar", menu._estado == "closed")
-checar("autonomia CONTINUA bloqueada - o CompanionPanel ainda está aberto", mascot_app.safety.autonomia_permitida is False)
-mascot_app.companion_panel.hide()
-checar("fechar o CompanionPanel libera o motivo dele", mascot_app.safety.autonomia_permitida is True)
+checar("autonomia CONTINUA bloqueada - a conversa ainda está ativa", mascot_app.safety.autonomia_permitida is False)
+mascot_app.conversation.sair()
+checar("sair da conversa libera o motivo dela", mascot_app.safety.autonomia_permitida is True)
 
-modo_antes = mascot_app.companion_panel._modo_voz_atual
+# "Voz" (corrigido 2026-09-06) - clicar deixou de ciclar direto; abre um
+# Nível 2 (menu continua aberto), escolher uma opção aplica na hora no
+# MESMO serviço de conversa (nunca um estado próprio duplicado) e volta sozinho
+# ao Nível 1, com o círculo "Voz" já mostrando o ícone/rótulo do modo novo.
+from mascot import conversation_service as conversation_service_module  # noqa: E402
+
+modo_antes = mascot_app.conversation_service.modo_voz_atual
 menu.abrir()
 bombear(1.0)
+circulo_voz = menu._circulo_voz_nivel1
+glifo_antes = circulo_voz._glifo
 menu._ao_clicar("voz")
-checar("clicar 'Voz' ciclou o MESMO modo do CompanionPanel (nunca um estado próprio duplicado)", mascot_app.companion_panel._modo_voz_atual != modo_antes)
+checar("clicar 'Voz' NÃO fecha o menu - abre o Nível 2", menu._nivel == 2 and menu.esta_aberto)
+checar("Nível 1 (4 itens) fica escondido enquanto o Nível 2 está de pé", all(not c.isVisible() for c in menu._circulos))
+checar("Nível 2 mostra as 3 opções de voz + Voltar, já visíveis (troca instantânea)", all(c.isVisible() and c._progresso >= 0.999 for c in menu._circulos_voz))
+
+indice_modo_alvo = 0 if modo_antes != menu_sao_module.ORDEM_NIVEL2_VOZ[0] else 1
+modo_alvo = menu_sao_module.ORDEM_NIVEL2_VOZ[indice_modo_alvo]
+circulo_marcado_antes = [c for c in menu._circulos_voz if c._marcado]
+checar(
+    "a opção do modo ATUAL nasce marcada no Nível 2 (destaque de contorno)",
+    len(circulo_marcado_antes) == 1 and circulo_marcado_antes[0]._rotulo == conversation_service_module.MODOS_VOZ_TEXTO[modo_antes],
+)
+menu._ao_selecionar_modo_voz(modo_alvo)
+checar("selecionar uma opção aplica o modo no serviço de conversa", mascot_app.conversation_service.modo_voz_atual == modo_alvo)
+checar("selecionar uma opção volta sozinho ao Nível 1 (menu continua aberto)", menu._nivel == 1 and menu.esta_aberto)
+checar("Nível 1 volta a ficar visível, Nível 2 escondido de novo", all(c.isVisible() for c in menu._circulos) and all(not c.isVisible() for c in menu._circulos_voz))
+checar("círculo 'Voz' do Nível 1 já reflete o NOVO modo (ícone mudou)", circulo_voz._glifo == conversation_service_module.MODOS_VOZ_GLIFO[modo_alvo] and circulo_voz._glifo != glifo_antes)
+
+menu._ao_clicar("voz")
+checar("reabrir o Nível 2 marca a opção certa pro modo JÁ trocado", any(c._marcado and c._rotulo == conversation_service_module.MODOS_VOZ_TEXTO[modo_alvo] for c in menu._circulos_voz))
+circulo_voltar = menu._circulos_voz[-1]
+checar("último círculo do Nível 2 é o 'Voltar'", circulo_voltar._rotulo == "Voltar")
+circulo_voltar.clicado.emit()
+checar("'Voltar' retorna ao Nível 1 SEM mudar o modo", menu._nivel == 1 and mascot_app.conversation_service.modo_voz_atual == modo_alvo)
+
+menu._ao_clicar("voz")
+checar("Escape no Nível 2 volta só um nível (não fecha o menu inteiro)", menu._nivel == 2)
+evento_escape_voz = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+menu.keyPressEvent(evento_escape_voz)
+checar("1º Escape sai do Nível 2 e mantém o menu aberto", menu._nivel == 1 and menu.esta_aberto)
+menu.keyPressEvent(evento_escape_voz)
 bombear(1.0)
+checar("2º Escape (já no Nível 1) fecha o menu normalmente", menu._estado == "closed")
 
 checar(
     "nenhum item nasce desabilitado (2026-09-03: os 4 ganharam conteúdo real)",

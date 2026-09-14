@@ -27,9 +27,11 @@ também só é lido no construtor) - a UI avisa isso explicitamente nesses
 dois campos, não deixa a pessoa achar que já valeu."""
 from __future__ import annotations
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 from mascot import config
+from mascot import platform_windows
 from mascot.gesture_wheel_editor import EditorGestureWheel
 from mascot.qt_widgets import (
     BG_COLOR, GAIA_GOLD, SURFACE_COLOR, CheckboxQuadrado, ModalBase, Switch,
@@ -81,6 +83,11 @@ class ModalConfiguracoes(ModalBase):
         self.resize(940, 780)
         self.setMinimumSize(760, 620)
         self.setStyleSheet(f"background-color: {BG_COLOR};")
+        # O modal é outra janela top-level: respeita a preferência persistida
+        # já ao nascer, sem depender de o usuário alternar o switch de novo.
+        QTimer.singleShot(0, lambda: platform_windows.aplicar_protecao_captura(
+            self, bool(self._config.get("proteger_de_captura")),
+        ))
 
         # Layout modelado no modal "🧑‍🎨 Avatar Virtual" da GAIA
         # (`ui/qt_modais/avatar_virtual.py`) - `QVBoxLayout(self)` sem
@@ -177,6 +184,32 @@ class ModalConfiguracoes(ModalBase):
             "frequente · travessuras = inclui comportamentos arriscados, se "
             "ligados abaixo. Aplica na hora."
         ))
+
+        switch_privacidade = Switch(
+            "Privacidade de captura ativa",
+            "Visível em capturas",
+            marcado=self._config.get("proteger_de_captura", False),
+        )
+        switch_privacidade.stateChanged.connect(
+            lambda _estado, controle=switch_privacidade: self._alternar_protecao_captura(
+                controle.isChecked()
+            )
+        )
+        lay_f.addWidget(switch_privacidade)
+        lay_f.addWidget(criar_descricao(
+            "Quando ligado, o Windows tenta esconder a Galateia, bubbles e campo de "
+            "entrada de screenshots, Discord e OBS compatíveis. O resultado depende "
+            "do método de captura; câmera externa nunca é coberta."
+        ))
+
+    def _alternar_protecao_captura(self, ativo):
+        self._salvar_mascot("proteger_de_captura", bool(ativo))
+        aplicadas, total = platform_windows.aplicar_protecao_captura_em_janelas(bool(ativo))
+        if total and aplicadas < total:
+            print(
+                f" [SISTEMA] LOKI: proteção de captura aplicada em {aplicadas}/{total} janelas; "
+                "as demais não oferecem suporte neste ambiente."
+            )
 
         sw_clique = Switch(
             "Clique-através quando ociosa: LIGADO", "Clique-através quando ociosa: desligado",

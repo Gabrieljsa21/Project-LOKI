@@ -23,7 +23,7 @@ ao subprocesso, ver `MascotWindow.clicada`), e emoção viaja dentro de
 from __future__ import annotations
 
 VERSAO_PROTOCOLO = 1
-TAMANHO_MAXIMO_MENSAGEM_BYTES = 65536
+TAMANHO_MAXIMO_MENSAGEM_BYTES = 4_000_000  # era 65536 - 2026-09-07, imagem anexada (`evento_chat_submitted`) precisa caber (JPEG 1024x1024 qualidade 70 + base64 fica bem abaixo disso, mas com folga real pro caso incomum de uma imagem mais pesada)
 
 ESTADOS_SEMANTICOS_VALIDOS = frozenset(
     {"hidden", "idle", "listening", "transcribing", "thinking", "speaking", "interrupted", "error"}
@@ -85,11 +85,20 @@ def evento_voice_mode_changed(modo) -> dict:
 VOZES_MODOS_VALIDOS = frozenset({"voz_continua", "click_to_talk", "ouvir_pc", None})
 
 
-def evento_chat_submitted(id: str, text: str) -> dict:
+def evento_chat_submitted(id: str, text: str, imagem_base64: str | None = None, imagem_mime: str = "image/jpeg") -> dict:
     """Mascot -> GAIA (CompanionPanel, 2026-09-01) - texto digitado no
     CompanionPanel. `id` (uuid hex) amarra a resposta correspondente, ver
-    `evento_assistant_message`."""
-    return {"type": "chat_submitted", "id": id, "text": text}
+    `evento_assistant_message`. `imagem_base64` (2026-09-07, Ctrl+V/anexo
+    de imagem no Conversation Overlay) - JPEG já comprimido/redimensionado
+    do lado do Mascot (`mascot/conversation_overlay/input_bar.py`, MESMO
+    padrão de `capturar_tela_b64`: thumbnail 1024x1024, qualidade 70) -
+    `None` (padrão) produz o MESMO dict de sempre, byte a byte, pra
+    qualquer chamada antiga continuar funcionando sem mudar nada."""
+    evento = {"type": "chat_submitted", "id": id, "text": text}
+    if imagem_base64 is not None:
+        evento["imagem_base64"] = imagem_base64
+        evento["imagem_mime"] = imagem_mime
+    return evento
 
 
 def evento_stop_speaking_requested() -> dict:

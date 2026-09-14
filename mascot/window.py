@@ -18,11 +18,11 @@ import random
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QPointF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, Qt, QTimer, Signal
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QApplication, QWidget
 
-from mascot import chaos_flight, platform_windows, state_catalog
+from mascot import chaos_flight, config, platform_windows, state_catalog
 from mascot.animation_controller import AnimationController
 from mascot.halo import Halo
 from mascot.physics import MovimentoAmortecido, MovimentoComDuracaoFixa, MovimentoQuedaGravidade
@@ -135,6 +135,19 @@ class MascotWindow(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
+        # 🔥 CORRIGIDO (2026-09-07, achado ao vivo: janela "Galateia" surgiu
+        # em branco/travada depois de reiniciar) - `aplicar_protecao_captura`
+        # chama `widget.winId()`, que força a criação IMEDIATA do HWND
+        # nativo. Chamado aqui (no meio do `__init__`, ANTES de `resize`/
+        # layout/conteúdo) força esse HWND a existir sem geometria/conteúdo
+        # nenhum ainda - o mesmo tipo de problema de timing Qt/Windows já
+        # visto em `bubble.py::_BolhaBase.entrar` (`raise_()` precisou do
+        # mesmo adiamento). `QTimer.singleShot(0, ...)` adia a chamada pro
+        # próximo tick do event loop, depois que o construtor inteiro (e o
+        # primeiro `show()`) já terminou de rodar.
+        QTimer.singleShot(0, lambda: platform_windows.aplicar_protecao_captura(
+            self, bool(config.carregar_config_mascot().get("proteger_de_captura")),
+        ))
 
         asset = controller.quadro_atual
         largura = int((asset.width() if asset else 384) * self._escala)

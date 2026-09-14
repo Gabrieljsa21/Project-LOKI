@@ -12,9 +12,40 @@ uma animação de idle, não uma função crítica, então falso positivo
 """
 from __future__ import annotations
 
+import ctypes
+
 import win32api
 import win32con
 import win32gui
+
+WDA_NONE = 0x00000000
+WDA_EXCLUDEFROMCAPTURE = 0x00000011
+
+
+def aplicar_protecao_captura(widget, ativo: bool) -> bool:
+    """Oculta uma janela de capturas compatíveis do Windows 10 2004+.
+
+    Falha sem interromper a interface em versões antigas, sessões remotas ou
+    backends Qt que ainda não tenham um HWND válido.
+    """
+    try:
+        hwnd = int(widget.winId())
+        afinidade = WDA_EXCLUDEFROMCAPTURE if ativo else WDA_NONE
+        return bool(ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, afinidade))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def aplicar_protecao_captura_em_janelas(ativo: bool) -> tuple[int, int]:
+    """Aplica a preferência a todas as janelas top-level já criadas."""
+    try:
+        from PySide6.QtWidgets import QApplication
+
+        janelas = list(QApplication.topLevelWidgets())
+    except Exception:
+        return 0, 0
+    aplicadas = sum(1 for janela in janelas if aplicar_protecao_captura(janela, ativo))
+    return aplicadas, len(janelas)
 
 
 def esta_em_tela_cheia_ou_jogo() -> bool:
