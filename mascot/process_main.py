@@ -107,6 +107,7 @@ from mascot.window import MascotWindow
 VAR_AMBIENTE_CANAL = "GAIA_MASCOT_CANAL"
 VAR_AMBIENTE_TOKEN = "GAIA_MASCOT_TOKEN"
 INTERVALO_HEARTBEAT_MS = 5000
+VALIDADE_EVENTO_SIREN_SEGUNDOS = 10
 # Sem isso, um subprocesso "amarrado" (com canal/token - ver
 # `_montar_bridge`) sobrevivia pra sempre depois da GAIA morrer sem
 # avisar (`taskkill`/crash/restart do watchdog nunca chamam
@@ -130,6 +131,7 @@ class MascotApp:
         self.config_behaviors = config.carregar_config_behaviors()
         self._modal_configuracoes = None  # instância única, ver _abrir_configuracoes
         self.playback_state = {}
+        self._playback_ultimo_evento = 0.0
 
         from mascot.playback_events import ReceptorPlayback
         self.playback_receiver = ReceptorPlayback()
@@ -152,6 +154,7 @@ class MascotApp:
             self.config_mascot,
             self.config_behaviors,
         )
+        self.scheduler.definir_fonte_musica(self.musica_tocando)
         # arraste manual real precisa cancelar física/perseguição autônoma
         # em andamento - pedido do usuário, 2026-08-29: "quando eu segurar
         # ela, tem de interromper na hora a animação atual".
@@ -168,8 +171,10 @@ class MascotApp:
         # As duas responsabilidades restantes vivem agora neste QObject sem
         # janela: envio pelo bridge e estado do modo de voz do Menu SAO.
         self.conversation_service = ConversationService(lambda: self.bridge)
-        # Alias apenas para consumidores cross-repo ainda na nomenclatura
-        # antiga. O objeto apontado aqui não é QWidget e não pode abrir janela.
+        # Alias mantido de propósito: `assistant/testes/testar_mascot_protocolo.py`
+        # (GAIA) ainda lê `mascot_app.companion_panel._mensagens`. O objeto
+        # apontado aqui não é QWidget e não pode abrir janela; o módulo
+        # `companion_panel.py` em si foi apagado em 2026-11-09 (sem importador).
         self.companion_panel = self.conversation_service
 
         # 🔥 Conversation Overlay / "Bubble Mode" (2026-09-06, pedido do
@@ -185,7 +190,7 @@ class MascotApp:
         self.conversation.texto_enviado.connect(self.conversation_service.enviar_mensagem)
         self.conversation_service.falha_envio.connect(self.conversation.receber_erro)
         self.window.arraste_iniciado.connect(self.conversation.fechar_imediato)
-        self._registrar_hotkey_companion_panel()
+        self._registrar_hotkey_conversa()
 
         # 🔥 Menu SAO (2026-09-02, `GAIA_MENU_SAO.md`) - camada ADICIONAL,
         # não substitui o clique direto acima ("Conversar" é redundante de
@@ -207,9 +212,19 @@ class MascotApp:
 
         self.window.show()
 
+    def musica_tocando(self) -> bool:
+        """`playing` sozinho não basta: se o SIREN fechar sem mandar
+        `track_ended`, o estado ficaria "tocando" pra sempre. O SIREN manda
+        `progress` a cada segundo enquanto toca, então silêncio maior que
+        `VALIDADE_EVENTO_SIREN_SEGUNDOS` significa que parou."""
+        return bool(self.playback_state.get("playing")) and (
+            time.monotonic() - self._playback_ultimo_evento < VALIDADE_EVENTO_SIREN_SEGUNDOS
+        )
+
     def _ao_evento_siren(self, evento):
         """Mantém estado visual-consumível sem acoplar o LOKI ao MPV."""
         tipo = evento.get("type")
+        self._playback_ultimo_evento = time.monotonic()
         if tipo == "track_ended":
             self.playback_state = {"playing": False, **evento}
         elif tipo == "playback_paused":
@@ -220,7 +235,7 @@ class MascotApp:
             if tipo in {"track_started", "playback_resumed", "progress"}:
                 self.playback_state["playing"] = True
 
-    def _registrar_hotkey_companion_panel(self) -> None:
+    def _registrar_hotkey_conversa(self) -> None:
         """Hotkey global registrado DIRETO neste subprocesso (lib `keyboard`,
         mesma já usada em `run.py`/no antigo `vtuber_overlay.py`) - funciona
         mesmo em modo demonstração, sem GAIA rodando. O callback do
@@ -247,7 +262,9 @@ class MascotApp:
             # inválido/conflitante nunca deve impedir o resto do Mascot de
             # subir; ainda dá pra abrir a conversa clicando direto na
             # personagem ou pelo Menu SAO ("Conversar").
-            print(f" [LOKI] Não consegui registrar o atalho da conversa ({atalho}): {e}")
+            logging.getLogger(__name__).warning(
+                "Não consegui registrar o atalho da conversa (%s): %s", atalho, e,
+            )
 
     def _montar_click_destino(self) -> ClickDestinoWatcher | None:
         """"Ir até aqui" (pedido do usuário, 2026-08-29) - padrão Alt +
@@ -372,15 +389,11 @@ class MascotApp:
         chama isso, pra bandeja e Configurações nunca terem duas cópias da
         mesma lógica de reiniciar.
 
-        Limitação aceita conscientemente (não corrigida, exigiria mudar o
-        protocolo dos dois lados): `MascotSupervisor` rastreia o Mascot pelo
-        `Popen` exato que ELA subiu - reiniciar por AQUI troca o processo
-        real sem ela saber, então o switch "Ativado" do Painel dela pode
-        mostrar "desligado" por engano até a GAIA reiniciar, e desligar por
-        lá logo em seguida pode não matar o processo novo (ela tentaria
-        matar o PID antigo, que já nem existe mais). "Sair" pela bandeja
-        deste próprio LOKI continua sendo o jeito garantido de fechar de
-        vez."""
+        O processo novo informa o próprio PID no `ready` do handshake
+        (`protocol/server.py`, 2026-11-09) - `MascotSupervisor`, do lado da
+        GAIA, passa a seguir esse PID em vez do `Popen` original, então o
+        switch "Ativado" do Painel dela e o desligar por lá continuam
+        valendo depois de um reinício feito por aqui."""
         if not confirmar_acao(
             self.window, "Reiniciar Mascot",
             "Fecha este Mascot e abre um novo agora. Confirma?",

@@ -37,6 +37,7 @@ import logging
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
+from mascot import config
 from mascot.conversation_overlay import positioning
 from mascot.conversation_overlay.bubble import LARGURA_PADRAO, Bubble, IndicadorVoz
 
@@ -50,7 +51,16 @@ MAXIMO_BUBBLES_VISIVEIS = 3
 # também pelo empilhamento virtual do modo histórico (2026-09-07).
 GAP_MESMO_AUTOR = 5
 GAP_TROCA_AUTOR = 10
-TIMEOUT_INATIVIDADE_MS = 15_000  # 2026-09-06: usuário pediu 10s, testou e voltou atrás ("15s tava bom") - mantido em 15s
+# Padrão de 15s (2026-09-06: usuário pediu 10s, testou e voltou atrás -
+# "15s tava bom"); configurável desde 2026-11-09 (`bubble_timeout_segundos`).
+TIMEOUT_INATIVIDADE_MS = config.valor_bubble("bubble_timeout_segundos") * 1000
+
+
+def definir_timeout_inatividade(segundos: int) -> None:
+    """Troca o tempo de inatividade na hora (modal de Configurações) - vale
+    a partir do próximo reinício do timer, ou seja, da próxima mensagem."""
+    global TIMEOUT_INATIVIDADE_MS
+    TIMEOUT_INATIVIDADE_MS = int(segundos) * 1000
 # opacidade de REPOUSO por distância do item mais novo (índice 0 = mais
 # perto da GAIA) - doc, seção 7: "antigas perdem destaque, fazem fade".
 # Além do fim da lista, tudo usa o último valor (piso).

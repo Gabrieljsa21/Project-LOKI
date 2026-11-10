@@ -90,6 +90,9 @@ def _clamp_para_direcao(atual: float, alvo_natural: float, minimo: float, maximo
 # id como chave (comportamento padrão).
 CHAVE_CONFIG_POR_BEHAVIOR = {"stand_up": "taskbar_sit"}
 
+# Espaço mínimo entre duas tentativas de ir sentar pra ouvir música.
+INTERVALO_SENTAR_MUSICA_SEGUNDOS = 60
+
 ANIMACOES_VARIACOES_SENTADAS = tuple(
     sorted(
         id_
@@ -159,6 +162,10 @@ class BehaviorScheduler(QObject):
         self._destino_ao_chegar: Callable[[], None] | None = None
         self._destino_tolerancia_px: float = TOLERANCIA_DESTINO_PX
         self._saltos_destino_restantes = 0
+        # Reação à música (2026-11-09, `music_listening`) - `MascotApp`
+        # entrega a fonte (`definir_fonte_musica`); sem ela, nunca "toca".
+        self._musica_tocando: Callable[[], bool] = lambda: False
+        self._ultima_tentativa_sentar_musica = 0.0
 
         self._behaviors = [
             Behavior(
@@ -228,13 +235,26 @@ class BehaviorScheduler(QObject):
         self.__ocupado = valor
         self._ocupado_desde = time.monotonic() if valor else None
 
+    def definir_fonte_musica(self, musica_tocando: Callable[[], bool]) -> None:
+        self._musica_tocando = musica_tocando
+
+    def _ouvindo_musica(self) -> bool:
+        """Enquanto o SIREN toca (e o toggle `music_listening` está ligado),
+        ela senta na barra e fica: `sentada_balancando-pernas`, o idle
+        sentado, já É o gesto de quem ouve música - nenhum clipe novo. As
+        variações sentadas continuam; levantar e vagar ficam suspensos
+        (`_elegivel_pelo_estado`). Some sozinho com `reduce_motion`/
+        autonomia parada, que cortam o `_tick` antes de chegar aqui."""
+        return bool(self._behaviors_config.get("music_listening")) and self._musica_tocando()
+
     def _tick(self) -> None:
         self._verificar_afk()
         if self._ocupado:
             if self._ocupado_desde is not None and time.monotonic() - self._ocupado_desde > TIMEOUT_OCUPADO_SEGUNDOS:
-                print(
-                    f" [SISTEMA] Mascot: presa em _ocupado por mais de {TIMEOUT_OCUPADO_SEGUNDOS}s sem "
-                    "liberar sozinha (algum callback de transição não disparou) - destravando."
+                logger.warning(
+                    "Presa em _ocupado por mais de %ss sem liberar sozinha "
+                    "(algum callback de transição não disparou) - destravando.",
+                    TIMEOUT_OCUPADO_SEGUNDOS,
                 )
                 self._cancelar_movimento_e_sinais_pendentes()
                 self._ocupado = False
@@ -246,6 +266,16 @@ class BehaviorScheduler(QObject):
             return
 
         agora = time.monotonic()
+        if (
+            self._ouvindo_musica()
+            and self._controller.animacao_atual == "flutuando_idle"
+            and agora - self._ultima_tentativa_sentar_musica > INTERVALO_SENTAR_MUSICA_SEGUNDOS
+        ):
+            # Uma tentativa por intervalo: se não houver barra alcançável,
+            # ela não fica insistindo a cada tick.
+            self._ultima_tentativa_sentar_musica = agora
+            if self.forcar_sentar():
+                return
         candidatos = [
             behavior
             for behavior in self._behaviors
@@ -386,6 +416,8 @@ class BehaviorScheduler(QObject):
             self._callback_estado_pendente = None
 
     def _elegivel_pelo_estado(self, behavior_id: str) -> bool:
+        if behavior_id in ("stand_up", "wander") and self._ouvindo_musica():
+            return False
         if behavior_id == "taskbar_sit":
             return self._controller.estado_logico != "sentada"
         if behavior_id == "sitting_variations":

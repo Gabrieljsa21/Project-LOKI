@@ -27,11 +27,14 @@ também só é lido no construtor) - a UI avisa isso explicitamente nesses
 dois campos, não deixa a pessoa achar que já valeu."""
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 from mascot import config
 from mascot import platform_windows
+from mascot.conversation_overlay import bubble_stack
 from mascot.gesture_wheel_editor import EditorGestureWheel
 from mascot.qt_widgets import (
     BG_COLOR, GAIA_GOLD, SURFACE_COLOR, CheckboxQuadrado, ModalBase, Switch,
@@ -57,6 +60,7 @@ BEHAVIORS_LABELS = {
     "taskbar_sit": "Sentar na barra de tarefas",
     "sitting_variations": "Variações sentadas (espreguiçar, cochilar)",
     "wander": "Vagar pela tela (voo autônomo entre monitores)",
+    "music_listening": "Ouvir música do SIREN (senta na barra e fica enquanto a faixa toca)",
     "cursor_swing": "Balançar no cursor (precisa de clipes próprios, ainda sem cobertura)",
     "cursor_hunt": "Caçar o cursor (precisa de clipes próprios, ainda sem cobertura)",
     "tug_of_war": "Cabo de guerra (usa hook de mouse por até 3s - desligado por padrão)",
@@ -103,12 +107,13 @@ class ModalConfiguracoes(ModalBase):
         aba_geral, geral = self._aba_com_scroll()
         geral.addWidget(criar_descricao(
             "A maioria dos campos abaixo aplica na hora, sem precisar reiniciar "
-            "- só Escala e Orçamento de memória (marcados abaixo) precisam de um "
+            "- só Escala, Largura do bubble e Orçamento de memória (marcados abaixo) precisam de um "
             "reinício do Mascot pra valer de verdade. Ligar/desligar o Mascot "
             "em si continua pela bandeja do sistema (\"Sair\") ou, se estiver "
             "rodando junto da GAIA, pelo Painel principal dela."
         ))
         self._montar_card_presenca(geral)
+        self._montar_card_conversa(geral)
         geral.addStretch(1)
         abas.addTab(aba_geral, "Geral")
 
@@ -206,9 +211,9 @@ class ModalConfiguracoes(ModalBase):
         self._salvar_mascot("proteger_de_captura", bool(ativo))
         aplicadas, total = platform_windows.aplicar_protecao_captura_em_janelas(bool(ativo))
         if total and aplicadas < total:
-            print(
-                f" [SISTEMA] LOKI: proteção de captura aplicada em {aplicadas}/{total} janelas; "
-                "as demais não oferecem suporte neste ambiente."
+            logging.getLogger(__name__).warning(
+                "Proteção de captura aplicada em %s/%s janelas; as demais não "
+                "oferecem suporte neste ambiente.", aplicadas, total,
             )
 
         sw_clique = Switch(
@@ -234,6 +239,37 @@ class ModalConfiguracoes(ModalBase):
         linha_afk.addWidget(spin_afk)
         linha_afk.addStretch(1)
         lay_f.addLayout(linha_afk)
+
+    # ================================================================
+    def _montar_card_conversa(self, lay):
+        lay_f = self._card(lay, "Conversa (bubbles)")
+
+        minimo, maximo = config.LIMITES_BUBBLE["bubble_timeout_segundos"]
+        linha_timeout = QHBoxLayout()
+        linha_timeout.addWidget(criar_descricao("Segundos sem atividade até os bubbles sumirem:"))
+        spin_timeout = criar_spinbox(minimo, maximo, self._config["bubble_timeout_segundos"], largura=70)
+
+        def _mudar_timeout(v):
+            self._salvar_mascot("bubble_timeout_segundos", int(v))
+            bubble_stack.definir_timeout_inatividade(int(v))
+
+        spin_timeout.valueChanged.connect(_mudar_timeout)
+        linha_timeout.addWidget(spin_timeout)
+        linha_timeout.addStretch(1)
+        lay_f.addLayout(linha_timeout)
+        lay_f.addWidget(criar_descricao("Aplica na hora, a partir da próxima mensagem."))
+
+        minimo, maximo = config.LIMITES_BUBBLE["bubble_largura_texto"]
+        linha_largura = QHBoxLayout()
+        linha_largura.addWidget(criar_descricao("Largura máxima do texto de um bubble (px):"))
+        spin_largura = criar_spinbox(minimo, maximo, self._config["bubble_largura_texto"], largura=70)
+        spin_largura.valueChanged.connect(lambda v: self._salvar_mascot("bubble_largura_texto", int(v)))
+        linha_largura.addWidget(spin_largura)
+        linha_largura.addStretch(1)
+        lay_f.addLayout(linha_largura)
+        lay_f.addWidget(criar_descricao(
+            "O campo de digitar acompanha a mesma largura. Precisa reiniciar o Mascot (aba Sistema)."
+        ))
 
     # ================================================================
     def _montar_card_aparencia(self, lay):

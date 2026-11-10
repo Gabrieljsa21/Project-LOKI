@@ -14,6 +14,7 @@ seção 1.7: Live2D continua como rollback até o cutover da Fase 8).
 from __future__ import annotations
 
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -27,7 +28,15 @@ from mascot.animation_controller import AnimationController
 from mascot.halo import Halo
 from mascot.physics import MovimentoAmortecido, MovimentoComDuracaoFixa, MovimentoQuedaGravidade
 
-CAMINHO_POSICAO = Path(__file__).resolve().parents[1] / "data" / "mascot_posicao.json"
+# `None` em teste automatizado (`QT_QPA_PLATFORM=offscreen`, mesmo sinal que
+# `process_main.py` já usa pra não registrar hotkey global de verdade) - a
+# posição real do usuário nunca é lida nem sobrescrita por um
+# `MascotWindow` construído em teste (achado 2026-11-09: rodar a suíte
+# trocava a posição salva da personagem).
+CAMINHO_POSICAO: Path | None = (
+    None if os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+    else Path(__file__).resolve().parents[1] / "data" / "mascot_posicao.json"
+)
 
 # reações de "sendo carregada" (loop enquanto "agarrada") - o catálogo só
 # declara UM fallback fixo pra "flutuando_para_agarrada" (sempre
@@ -63,7 +72,7 @@ LEQUE_LOOPS = (
 
 
 def _carregar_posicao_salva(monitores: int) -> dict | None:
-    if not CAMINHO_POSICAO.is_file():
+    if CAMINHO_POSICAO is None or not CAMINHO_POSICAO.is_file():
         return None
     try:
         todas = json.loads(CAMINHO_POSICAO.read_text(encoding="utf-8"))
@@ -76,6 +85,8 @@ def _carregar_posicao_salva(monitores: int) -> dict | None:
 
 
 def _salvar_posicao_atual(monitores: int, x: int, y: int) -> None:
+    if CAMINHO_POSICAO is None:
+        return
     todas = {}
     if CAMINHO_POSICAO.is_file():
         try:

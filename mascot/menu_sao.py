@@ -4,7 +4,7 @@ Sword Art Online, especificado em `C:\\Workspace\\GAIA_MENU_SAO.md`. Scroll
 para baixo sobre a GAIA abre uma coluna vertical de 4 círculos (Conversar/
 Voz/Ações/GAIA) ancorada no lado com mais espaço livre; scroll para cima
 (sobre ela ou sobre o próprio menu) ou iniciar um arraste fecha. Mora no
-MESMO subprocesso do Mascot (como `companion_panel.py`), nunca importa nada
+MESMO subprocesso do Mascot (como `conversation_service.py`), nunca importa nada
 do processo da GAIA - fala com ela só pelos mecanismos que já existem
 (`conversation_overlay.ConversationController`/`companion_panel.
 ciclar_modo_voz`).
@@ -52,7 +52,7 @@ conversa 2026-09-02 sobre as duas decisões que mudam comportamento global):
 - árvore de submenu (nível 2+) só existe pra "Voz" por enquanto (ver acima,
   `_entrar_nivel2_voz`/`_sair_nivel2_voz`/`_trocar_nivel`) - reaproveita a
   MESMA coluna/pílulas do Nível 1 (glifos `◉`/`🎙`/`⊘`/`‹`, reutilizados
-  de `companion_panel.MODOS_VOZ_GLIFO` pra manter consistência visual com
+  de `conversation_service.MODOS_VOZ_GLIFO` pra manter consistência visual com
   outras interfaces do LOKI, como o doc pede), troca INSTANTÂNEA entre os
   dois conjuntos de círculos (sem stagger próprio - só o open/close do
   menu inteiro tem a animação especificada no doc). `self.direcao` fica
@@ -108,7 +108,7 @@ IDS_DESABILITADOS = frozenset(id_ for id_, _, _, desabilitado in ITENS if desabi
 
 # Nível 2 "Voz" (2026-09-06) - ordem de EXIBIÇÃO pedida pelo usuário
 # (contínua -> push-to-talk -> desligada), independente da ordem do ciclo
-# interno de `companion_panel.MODOS_VOZ_CICLO` (que começa em "desligada").
+# interno de `conversation_service.MODOS_VOZ_CICLO` (que começa em "desligada").
 # "Voltar" ocupa o 4º slot - mesma contagem dos 4 itens do Nível 1, a
 # coluna nunca precisa mudar de altura entre os dois níveis.
 ID_VOLTAR = "voltar"

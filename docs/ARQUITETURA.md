@@ -46,7 +46,7 @@ A API depende do suporte do Windows e do aplicativo capturador. Qualquer falha r
 
 `mascot/playback_events.py` recebe por UDP local o schema `siren.playback.v1`. Ele valida tipo, sessão, faixa e sequência, descarta eventos repetidos ou atrasados e entrega o estado no thread principal do Qt. `MascotApp.playback_state` mantém faixa, pausa, posição e duração sem criar um segundo player.
 
-O receptor só oferece contexto para uma reação visual futura. Nenhuma animação ou cena foi escolhida automaticamente nesta etapa; essa camada deverá respeitar `reduce_motion` e continuar usando o SIREN como fonte única de reprodução, fila e histórico.
+Desde 2026-11-10 esse estado alimenta uma reação: `MascotApp.musica_tocando()` (verdadeiro só com `playing` e evento há menos de 10 s, já que o SIREN manda `progress` a cada segundo e pode fechar sem `track_ended`) é entregue ao `BehaviorScheduler`. Com o toggle `music_listening` ligado, o scheduler manda ela sentar na barra (`forcar_sentar`, uma tentativa a cada 60 s) e suspende `stand_up` e `wander` enquanto a música toca. A escolha foi usar o idle sentado (`sentada_balancando-pernas`), que já lê como "ouvindo música": nenhum clipe novo e nenhum segundo caminho de animação. A regra vive dentro do `_tick`, então `reduce_motion`, autonomia parada e os bloqueios do `SafetyController` valem para ela também. O SIREN continua sendo a fonte única de reprodução, fila e histórico.
 
 ## Por que repositório próprio (extraído em 2026-09-03)
 
@@ -107,6 +107,13 @@ supervisor, nunca fixo), heartbeat periódico, reconexão com backoff.
 CÓPIAS deliberadas do mesmo contrato - pequenos o bastante (138/63
 linhas) pra não valer uma dependência formal entre repos; se um evento
 novo for adicionado num lado, precisa ser replicado no outro.
+`testes/testar_contrato_gaia.py` compara o código das duas cópias
+(ignorando docstrings) quando o checkout da GAIA está ao lado.
+
+O `ready` do handshake leva o PID do processo (`pid`, 2026-11-10). O
+`pythonw.exe` do venv é um trampolim do uv, e "Reiniciar Mascot" troca o
+processo sem a GAIA participar; com o PID informado, o `MascotSupervisor`
+segue o processo real para o estado "rodando" e para encerrar a árvore.
 
 ## Contrato de asset (`mascot/asset_repository.py`)
 
@@ -153,6 +160,13 @@ caminho de arquivo (`assistant/integrations/mascot_config_client.py`,
 resolvido via `PROJETO_LOKI_DIR`/pasta irmã padrão) - nunca um import
 Python cruzando repositórios, já que os dois processos rodam em
 venvs/interpretadores diferentes.
+
+Em teste automatizado (`QT_QPA_PLATFORM=offscreen`) o runtime ignora os
+dados reais do usuário: `CAMINHO_POSICAO` vira `None` (posição nunca lida
+nem gravada) e `config.valor_bubble` devolve o padrão de fábrica. Os
+valores do Bubble Mode (`bubble_timeout_segundos`, `bubble_largura_texto`)
+têm limites em `config.LIMITES_BUBBLE`, fonte única para o modal e para
+quem lê.
 
 ## Modal de configurações nativo (`mascot/modal_configuracoes.py`)
 

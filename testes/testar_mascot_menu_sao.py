@@ -147,6 +147,16 @@ controller.parar()
 from mascot import menu_sao as menu_sao_module
 from mascot import process_main
 
+def bombear_ate(condicao, limite_segundos=5.0):
+    """Espera a CONDIÇÃO, não um tempo fixo - as animações do menu andam por
+    relógio real, e um `bombear(1.0)` fixo falhava com a máquina ocupada
+    (achado 2026-11-09, 5 casos falhando só na 1ª execução)."""
+    fim = time.monotonic() + limite_segundos
+    while time.monotonic() < fim and not condicao():
+        app.processEvents()
+        time.sleep(0.01)
+
+
 mascot_app = process_main.MascotApp()
 menu = mascot_app.menu_sao
 
@@ -174,7 +184,7 @@ menu._circulos[0].enterEvent(None)
 checar("hover num círculo AINDA animando é ignorado (evita expandir antes dele assentar)", menu._hover_estado == "closed")
 menu._circulos[0].leaveEvent(None)  # limpa o hover simulado antes de deixar a animação real terminar
 
-bombear(1.0)  # sobra de tempo pros 4 itens (3*55ms atraso + 220ms cada) convergirem
+bombear_ate(lambda: menu._estado == "open" and all(c._progresso >= 0.999 for c in menu._circulos))
 checar("estado converge pra 'open' sozinho", menu._estado == "open")
 checar("os 4 círculos terminam com progresso 1.0", all(c._progresso >= 0.999 for c in menu._circulos))
 
@@ -210,11 +220,11 @@ for _id_, _rotulo, _, _ in menu_sao_module.ITENS:
     )
 primeiro_circulo.enterEvent(None)
 checar("hover num círculo já assentado (progresso 1.0) começa a expandir", menu._hover_estado == "opening" and menu._circulo_animando is primeiro_circulo)
-bombear(0.5)
+bombear_ate(lambda: menu._hover_estado == "open" and primeiro_circulo._hover_progresso >= 0.999)
 checar("expansão converge pra 'open' com hover_progresso 1.0", menu._hover_estado == "open" and primeiro_circulo._hover_progresso >= 0.999)
 primeiro_circulo.leaveEvent(None)
 checar("tirar o mouse começa a recolher", menu._hover_estado == "closing")
-bombear(0.5)
+bombear_ate(lambda: menu._hover_estado == "closed" and primeiro_circulo._hover_progresso == 0.0)
 checar("recolhe de vez (hover_progresso volta a 0, estado 'closed')", menu._hover_estado == "closed" and primeiro_circulo._hover_progresso == 0.0)
 
 segundo_circulo = menu._circulos[1]

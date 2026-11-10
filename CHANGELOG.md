@@ -16,6 +16,34 @@ Versionamento: [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+### Adicionado
+
+- **Reação à música do SIREN:** enquanto uma faixa toca, a Galateia vai sentar na barra de tarefas e fica ouvindo; levantar e vagar ficam suspensos até a música parar, e as variações sentadas continuam. Toggle "Ouvir música do SIREN" em Configurações, aba Movimento (`music_listening`, ligado por padrão). O estado "tocando" expira 10 s depois do último evento, para o caso de o SIREN fechar sem avisar.
+- **Bubble Mode nas Configurações:** card "Conversa (bubbles)" na aba Geral com o tempo de inatividade até os bubbles sumirem (5 a 120 s, aplica na hora) e a largura máxima do texto (260 a 640 px, vale ao reiniciar).
+- **PID no `ready` do handshake:** depois de "Reiniciar Mascot" pela bandeja ou pelas Configurações, a GAIA passa a seguir o processo novo (exige a GAIA com o `MascotSupervisor` atualizado; com uma GAIA antiga nada muda).
+- **`scripts/rodar_testes.py`:** roda todos os `testes/testar_*.py` e resume o resultado.
+- **Testes novos:** `testar_reacao_musica.py` e `testar_contrato_gaia.py` (compara as cópias do protocolo com as do `assistant`).
+- **`docs/FUNCIONALIDADES.md`** (estado atual para o usuário) e **`CLAUDE.md`** (convenções do repositório).
+
+### Corrigido
+
+- **Rodar os testes trocava a posição salva da personagem:** em `QT_QPA_PLATFORM=offscreen`, `data/mascot_posicao.json` não é mais lido nem gravado.
+- **Teste do Menu SAO falhava com a máquina ocupada:** as esperas de tempo fixo viraram espera por condição (`bombear_ate`).
+- **Avisos perdidos sob `pythonw.exe`:** quatro `print` (atalho global, destravamento do agendador, proteção de captura parcial, porta do SIREN ocupada) passaram a ir para `data/mascot.log`.
+
+### Removido
+
+- `mascot/companion_panel.py` (439 linhas sem nenhum importador desde a remoção do painel do runtime).
+- Chaves `always_on_top` e `pause_in_fullscreen` de `MASCOT_PADRAO`: nenhum código as lia.
+- `spritesheet - Copia.png` de `arrastada_loop_emburrada` (cópia idêntica do `.webp`, 1,5 MB).
+
+### Alterado
+
+- Pillow, OpenCV e NumPy saíram das dependências do runtime e foram para o grupo `pipeline` (instalado por padrão no `uv sync`).
+- `docs/TODO.md` reescrito no padrão Prioridade/Complexidade/Status, sem as pendências que pertencem à GAIA.
+
 ## [0.1.0] - 2026-10-14
 
 ### Adicionado

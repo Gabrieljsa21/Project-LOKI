@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import socket
 import threading
@@ -52,7 +53,9 @@ class ReceptorPlayback(QObject):
             canal.settimeout(0.5)
             canal.bind((self.host, self.porta))
         except OSError as erro:
-            print(f" [LOKI] Eventos do SIREN indisponíveis na porta {self.porta}: {erro}")
+            logging.getLogger(__name__).warning(
+                "Eventos do SIREN indisponíveis na porta %s: %s", self.porta, erro,
+            )
             return False
         self._socket = canal
         self._parar.clear()

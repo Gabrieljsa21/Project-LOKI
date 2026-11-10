@@ -54,13 +54,14 @@ from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QWidget
 
+from mascot import config
 from mascot.conversation_overlay import estilo
 
 LARGURA_MINIMA = 90  # doc: "width = clamp(content_width + padding, MIN_BUBBLE_WIDTH, MAX_BUBBLE_WIDTH)" - só o balão, nunca inclui o avatar
 TAMANHO_AVATAR = 60  # diâmetro do retrato/ícone FORA do balão (era 26, inline - 2026-09-07 moveu pra fora e aumentou, referência visual do usuário)
 GAP_AVATAR_BUBBLE = 10  # respiro entre o avatar e a borda do balão
 LARGURA_AVATAR_AREA = TAMANHO_AVATAR + GAP_AVATAR_BUBBLE  # reserva total (avatar + respiro) descontada do orçamento de texto
-LARGURA_PADRAO = 380 + LARGURA_AVATAR_AREA  # TETO (doc: MAX_BUBBLE_WIDTH) do widget INTEIRO (balão + avatar) - 380 é o orçamento de texto (era o teto antigo, 2026-09-06), + LARGURA_AVATAR_AREA pra o avatar não tomar espaço que já tinha sido aumentado por causa do wrap desnecessário
+LARGURA_PADRAO = config.valor_bubble("bubble_largura_texto") + LARGURA_AVATAR_AREA  # TETO (doc: MAX_BUBBLE_WIDTH) do widget INTEIRO (balão + avatar) - 380 é o orçamento de texto (era o teto antigo, 2026-09-06), + LARGURA_AVATAR_AREA pra o avatar não tomar espaço que já tinha sido aumentado por causa do wrap desnecessário - o orçamento de texto é configurável desde 2026-11-09 (`bubble_largura_texto`, lido UMA vez na subida do processo: vale ao reiniciar)
 ALTURA_MAXIMA_TEXTO = 200  # doc: "não deixar o bubble ocupar metade da tela" - além disso, trunca + "Ver completo"
 ALTURA_MINIMA_BUBBLE = 40  # nunca menor que isto, mesmo pra "Olá" - dá espaço pro rodapé respirar
 PADDING_H = 16  # doc, polimento: "padding horizontal: 14 a 18px"
