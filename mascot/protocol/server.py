@@ -10,6 +10,7 @@ mesmo Mascot, uma segunda tentativa de conexão é fechada na hora.
 from __future__ import annotations
 
 import logging
+import os
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtNetwork import QLocalServer
@@ -70,7 +71,10 @@ class MascotBridgeServer(QObject):
             self._socket.close()
             return
         self._handshake_ok = True
-        self.enviar(mascot_events.evento_ready())
+        # `pid` (2026-11-09): depois de um "Reiniciar Mascot" feito por aqui, o
+        # processo real deixa de ser o `Popen` que a GAIA subiu - ela passa a
+        # seguir este PID (`MascotSupervisor`, lado da GAIA).
+        self.enviar(mascot_events.evento_ready(pid=os.getpid()))
         self.cliente_conectado.emit()
 
     def enviar(self, mensagem: dict) -> None:

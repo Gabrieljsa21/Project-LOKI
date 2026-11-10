@@ -20,28 +20,36 @@ wheels = [
 
 [[package]]
 name = "loki"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "keyboard" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "opencv-python" },
-    { name = "pillow" },
     { name = "psutil" },
     { name = "pyside6" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
 ]
 
+[package.dev-dependencies]
+pipeline = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "keyboard", specifier = ">=0.13" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "opencv-python", specifier = ">=4.8" },
-    { name = "pillow", specifier = ">=10.0" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "pyside6", specifier = ">=6.6" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },
+]
+
+[package.metadata.requires-dev]
+pipeline = [
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "opencv-python", specifier = ">=4.8" },
+    { name = "pillow", specifier = ">=10.0" },
 ]
 
 [[package]]

@@ -3,8 +3,8 @@
 simples e um handshake versionado - SEM Qt (seção 8.4: "core publica
 eventos sem importar Qt") - pra dar pra inspecionar/rotear de qualquer
 parte da GAIA sem puxar dependência de UI. O transporte de verdade
-(`QLocalServer`/`QLocalSocket`) fica em `features/mascot/protocol/` (lado
-subprocesso) e `integrations/mascot/bridge_client.py` (lado GAIA).
+(`QLocalServer`/`QLocalSocket`) fica em `mascot/protocol/` (Project LOKI,
+lado subprocesso) e `integrations/mascot/bridge_client.py` (lado GAIA).
 
 Só tem construtor/validação pros eventos que já têm consumidor real hoje
 (handshake, `ready`, `heartbeat`, `state_changed`, `shutdown`, e desde o
@@ -53,7 +53,7 @@ def evento_state_changed(state: str, source: str = "gaia", emotion: str | None =
     evento). É o humor atual (`humor_persistido.obter_humor_atual()`) -
     **histórico**: até 2026-09-01 o Mascot usava isso pra decidir a cor do
     halo; redesenhado em 2026-09-02 pro halo refletir MODO DE VOZ em vez
-    disso (ver `evento_voice_mode_changed`/`features/mascot/halo.py`) -
+    disso (ver `evento_voice_mode_changed`/`mascot/halo.py`, Project LOKI) -
     o campo continua sendo enviado (`core/agent/turno.py` ainda popula),
     mas o Mascot não consome mais `emotion` de `state_changed` hoje."""
     if state not in ESTADOS_SEMANTICOS_VALIDOS:
@@ -69,8 +69,8 @@ def evento_shutdown(reason: str = "") -> dict:
 
 
 def evento_voice_mode_changed(modo) -> dict:
-    """GAIA -> Mascot (2026-09-02) - halo por modo de voz (`features/mascot/
-    halo.py`, substituiu o halo por estado semântico/emoção - achado ao
+    """GAIA -> Mascot (2026-09-02) - halo por modo de voz (`mascot/halo.py`,
+    Project LOKI, substituiu o halo por estado semântico/emoção - achado ao
     vivo: "listening" nunca era disparado por nenhum caminho real de voz,
     então o halo antigo ficava sem cor a maior parte do tempo real de
     conversa). `modo` é o MESMO vocabulário de `PainelQt.disparar_modo`/

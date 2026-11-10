@@ -9,6 +9,7 @@ Python cruzando repositórios.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 CAMINHO_CONFIG = Path(__file__).resolve().parents[1] / "data" / "mascot_config.json"
@@ -16,10 +17,8 @@ CAMINHO_CONFIG = Path(__file__).resolve().parents[1] / "data" / "mascot_config.j
 MASCOT_PADRAO = {
     "enabled": True,
     "autonomy": "subtle",  # parada | subtle | viva | travessuras
-    "always_on_top": True,
     "click_through_when_idle": False,
     "reduce_motion": False,
-    "pause_in_fullscreen": True,
     "proteger_de_captura": False,
     "opacity": 1.0,
     "scale": 1.0,
@@ -56,7 +55,9 @@ MASCOT_PADRAO = {
     # (a Galateia flutuante finge dormir) - escopo pedido pelo usuário
     # explicitamente exclui pausar qualquer função real da GAIA.
     "afk_minutos": 10,
-    # CompanionPanel MVP (2026-09-01) - hotkey global registrado DIRETO no
+    # Atalho global da conversa (Conversation Overlay) - o nome da chave vem
+    # do CompanionPanel MVP (2026-09-01) e continua igual pra não invalidar
+    # config já salva nem o Painel da GAIA. Registrado DIRETO no
     # subprocesso (lib `keyboard`, mesma já usada em `run.py`/no antigo
     # `vtuber_overlay.py`) - funciona mesmo em modo demonstração, sem GAIA
     # rodando. Sugestão do plano (seção 9.1), "sempre configurável".
@@ -76,7 +77,28 @@ MASCOT_PADRAO = {
     # tudo p ser configuravel" - exposto no Painel ("🧚 Mascot (LOKI)" →
     # Desempenho).
     "memoria_orcamento_mb": 320.0,
+    # Conversation Overlay / "Bubble Mode" (2026-11-09, pendência do TODO:
+    # "todo valor hardcoded lá é candidato a virar campo do modal") - os
+    # limites aceitos ficam em `LIMITES_BUBBLE` abaixo, fonte única pro
+    # modal e pra quem lê o valor.
+    "bubble_timeout_segundos": 15,  # inatividade até a pilha de bubbles sumir (aplica na hora)
+    "bubble_largura_texto": 380,  # largura máxima do TEXTO de um bubble, em px (aplica ao reiniciar)
 }
+
+LIMITES_BUBBLE = {
+    "bubble_timeout_segundos": (5, 120),
+    "bubble_largura_texto": (260, 640),
+}
+
+
+def valor_bubble(chave: str) -> int:
+    """Valor configurado de uma chave de `LIMITES_BUBBLE`, sempre dentro do
+    limite. Em teste automatizado (`QT_QPA_PLATFORM=offscreen`) devolve o
+    padrão de fábrica - a suíte nunca depende do que o usuário escolheu."""
+    minimo, maximo = LIMITES_BUBBLE[chave]
+    if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        return MASCOT_PADRAO[chave]
+    return max(minimo, min(maximo, int(carregar_config_mascot()[chave])))
 
 BEHAVIORS_PADRAO = {
     "taskbar_sit": True,
@@ -85,6 +107,9 @@ BEHAVIORS_PADRAO = {
     "cursor_swing": False,
     "cursor_hunt": False,
     "tug_of_war": False,
+    # Reação à música do SIREN (2026-11-09) - enquanto uma faixa toca, ela
+    # vai sentar na barra e fica ouvindo (não levanta nem sai vagando).
+    "music_listening": True,
 }
 
 

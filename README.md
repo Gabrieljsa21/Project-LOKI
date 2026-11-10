@@ -14,7 +14,8 @@ Avatar animado que coloca a Galateia no desktop com movimentos, reações e uma 
 - menu de ações e roda de gestos;
 - skins, roupas, expressões, poses e diferentes aparências;
 - menus e elementos visuais inspirados em Sword Art Online;
-- conversa por balões e painel completo para textos longos;
+- conversa por balões ao redor da personagem, com histórico rolável;
+- reação à música tocando no SIREN;
 - execução em processo separado.
 
 ## Origem do nome
@@ -48,11 +49,10 @@ As configurações e a posição ficam em `data/mascot_config.json` e `data/masc
 ## Testes
 
 ```powershell
-$env:QT_QPA_PLATFORM = "offscreen"
-python testes/testar_mascot_assets.py
+.venv\Scripts\python.exe scripts\rodar_testes.py
 ```
 
-Os arquivos `testes/testar_mascot_*.py` podem ser executados separadamente.
+Um argumento filtra pelo nome do arquivo (`rodar_testes.py menu_sao`). Cada `testes/testar_*.py` também roda sozinho.
 
 ## Integrações com outros projetos
 
@@ -66,7 +66,7 @@ O modo de demonstração permite revisar a parte visual sem iniciar a GAIA.
 - [Guia de animações](docs/ANIMACOES_GALATEIA.md)
 - [Pendências](docs/TODO.md)
 - [Histórico de versões](CHANGELOG.md)
-- [Padrão de documentação](docs/PADRAO_DOCUMENTACAO.md)
+- [Funcionalidades](docs/FUNCIONALIDADES.md)
 
 ## Situação atual
 
