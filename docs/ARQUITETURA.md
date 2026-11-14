@@ -138,7 +138,11 @@ cold-start; todo caminho de RUNTIME usa `garantir_carregado_assincrono`
 - essa regra tinha uma exceção não documentada (`BehaviorScheduler.
 _iniciar_hop` usava `obter()` pros 3 clipes de cada salto, travando a UI
 por até ~1,5s quando não estavam em cache) corrigida em 2026-09-04, ver
-`CHANGELOG.md`.
+`CHANGELOG.md`. A checagem de "esse clipe existe?" do
+`BehaviorScheduler` (`Behavior.elegivel`, variação sentada, direções de voo)
+usa só `ids_disponiveis()`, nunca `obter()`: carregar para saber se existe
+travou a Gala por até 13 s em 2026-11-14 (`testar_agendador_sem_carga_sincrona.py`
+falha se o agendador chamar `obter()`).
 
 ## Grafo de estados (`mascot/state_catalog.py`)
 

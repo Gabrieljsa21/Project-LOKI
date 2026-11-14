@@ -16,11 +16,18 @@ Versionamento: [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-14
+
+### Corrigido
+
+- **A Gala parava de responder por 5 a 13 s a cada ~45 s** (achado ao vivo: "ela ta dando umas travadas vez ou outra, parece q para de responder"). `Behavior.elegivel` checava se os clipes de um comportamento existiam chamando `AssetRepository.obter()`, que decodifica na thread da interface tudo o que não está no cache. Sentada, a cada tick ela carregava os 16 clipes de "variação sentada" (~450 ms cada), e o watchdog registrava travadas de 5 a 13 s; a reação à música, que a mantém sentada, deixou isso constante. `elegivel` e a escolha da variação sentada passaram a olhar só a existência dos clipes (`_ids_existentes`), como as direções de voo já faziam desde 2026-09-05; a carga continua em segundo plano, pela própria transição. Teste novo: `testes/testar_agendador_sem_carga_sincrona.py`, em que `obter()` falha se for chamado.
+- O CHANGELOG da 0.3.0 citava "GAIA 0.76.0"; a versão da GAIA que passa `LOKI_SEM_ICONE_BANDEJA` é a 0.77.0.
+
 ## [0.3.0] - 2026-11-14
 
 ### Adicionado
 
-- **LOKI dentro da bandeja da GAIA:** ligado pela GAIA (`LOKI_SEM_ICONE_BANDEJA=1`, que o `MascotSupervisor` passa a partir da GAIA 0.76.0), o LOKI não cria ícone próprio na área de notificação, seguindo a regra do ecossistema. Os comandos da bandeja dele chegam pelo evento novo `tray_action` (`core/mascot_events.py`: `evento_tray_action`, `ACOES_BANDEJA`): Centralizar, Mostrar/ocultar, Clique-através e Modo seguro. Aberto sozinho (`iniciar_loki.bat`), o ícone continua igual.
+- **LOKI dentro da bandeja da GAIA:** ligado pela GAIA (`LOKI_SEM_ICONE_BANDEJA=1`, que o `MascotSupervisor` passa a partir da GAIA 0.77.0), o LOKI não cria ícone próprio na área de notificação, seguindo a regra do ecossistema. Os comandos da bandeja dele chegam pelo evento novo `tray_action` (`core/mascot_events.py`: `evento_tray_action`, `ACOES_BANDEJA`): Centralizar, Mostrar/ocultar, Clique-através e Modo seguro. Aberto sozinho (`iniciar_loki.bat`), o ícone continua igual.
 - `testes/testar_bandeja_gaia.py`: ícone opcional, os quatro comandos pelo caminho do evento, ação desconhecida recusada e o ícone de volta sem a variável.
 
 ### Corrigido

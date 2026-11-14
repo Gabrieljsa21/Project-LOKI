@@ -115,18 +115,27 @@ class Behavior:
     ultimo_disparo: float = field(default=0.0, init=False)
     disparos_na_janela: list = field(default_factory=list, init=False)
 
-    def elegivel(self, agora: float, repositorio: AssetRepository) -> bool:
+    def elegivel(self, agora: float, ids_existentes: frozenset[str]) -> bool:
         """`assets_necessarios` é a lista de candidatos do Behavior - basta
-        UM deles carregar de verdade (sem cair em fallback) pra valer a
-        pena rodar; behaviors com um só clipe obrigatório (ex.: Taskbar
-        Sit) continuam se comportando como "tudo ou nada" porque só têm
-        aquele único candidato pra checar."""
+        UM deles existir como asset pra valer a pena rodar; behaviors com um
+        só clipe obrigatório (ex.: Taskbar Sit) continuam se comportando
+        como "tudo ou nada" porque só têm aquele único candidato pra checar.
+
+        Checa EXISTÊNCIA (`ids_existentes`, pastas com `animation.json`),
+        nunca carga. Até 2026-11-14 usava `AssetRepository.obter()`, que
+        decodifica na thread da interface tudo o que não está no cache: com
+        ela sentada, os 16 clipes de "variação sentada" eram carregados a
+        cada tick (~450 ms cada), e a Gala parava de responder por 5 a 13 s
+        a cada ~45 s (achado ao vivo: "ela ta dando umas travadas vez ou
+        outra, parece q para de responder"). A reação à música, que a deixa
+        sentada o tempo todo, deixou isso constante. Mesmo erro já corrigido
+        em `_direcoes_disponiveis` (2026-09-05)."""
         if agora - self.ultimo_disparo < self.cooldown_segundos:
             return False
         self.disparos_na_janela = [t for t in self.disparos_na_janela if agora - t < 3600]
         if len(self.disparos_na_janela) >= self.orcamento_por_hora:
             return False
-        return any(repositorio.obter(id_).id == id_ for id_ in self.assets_necessarios)
+        return any(id_ in ids_existentes for id_ in self.assets_necessarios)
 
     def marcar_disparo(self, agora: float) -> None:
         self.ultimo_disparo = agora
@@ -281,7 +290,7 @@ class BehaviorScheduler(QObject):
             for behavior in self._behaviors
             if self._behaviors_config.get(CHAVE_CONFIG_POR_BEHAVIOR.get(behavior.id, behavior.id), False)
             and self._elegivel_pelo_estado(behavior.id)
-            and behavior.elegivel(agora, self._repositorio)
+            and behavior.elegivel(agora, self._ids_existentes)
         ]
         if not candidatos:
             return
@@ -486,7 +495,8 @@ class BehaviorScheduler(QObject):
         disponiveis = [
             id_
             for id_ in ANIMACOES_VARIACOES_SENTADAS
-            if self._repositorio.obter(id_).id == id_ and self._familia_disponivel(id_, agora)
+            # existência, não carga: a transição já carrega em segundo plano
+            if id_ in self._ids_existentes and self._familia_disponivel(id_, agora)
         ]
         if not disponiveis:
             self._ocupado = False
