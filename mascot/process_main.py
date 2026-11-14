@@ -106,6 +106,11 @@ from mascot.window import MascotWindow
 
 VAR_AMBIENTE_CANAL = "GAIA_MASCOT_CANAL"
 VAR_AMBIENTE_TOKEN = "GAIA_MASCOT_TOKEN"
+# Ligado pela GAIA, o LOKI não cria ícone próprio na área de notificação
+# (regra do ecossistema, 2026-11-14): o controle fica no item LOKI em
+# Sentinelas, na bandeja da GAIA, e chega pelo evento `tray_action`.
+# Aberto sozinho (`iniciar_loki.bat`), sem a variável, o ícone continua.
+VAR_AMBIENTE_SEM_ICONE = "LOKI_SEM_ICONE_BANDEJA"
 INTERVALO_HEARTBEAT_MS = 5000
 VALIDADE_EVENTO_SIREN_SEGUNDOS = 10
 # Sem isso, um subprocesso "amarrado" (com canal/token - ver
@@ -162,7 +167,8 @@ class MascotApp:
         self.window.arraste_finalizado.connect(self.scheduler.retomar_apos_arraste)
 
         self.click_destino = self._montar_click_destino()
-        self.tray = self._montar_tray()
+        self._autonomia_antes_modo_seguro: str | None = None
+        self.tray = None if os.environ.get(VAR_AMBIENTE_SEM_ICONE) == "1" else self._montar_tray()
 
         # O CompanionPanel visual foi removido definitivamente do runtime em
         # 2026-09-07. Ele já não era exibido desde que o histórico passou a
@@ -349,6 +355,8 @@ class MascotApp:
         elif tipo == "user_message":
             self.conversation_service.receber_mensagem_usuario(mensagem)
             self.conversation.receber_mensagem_usuario_externa(mensagem.get("text", ""))
+        elif tipo == "tray_action":
+            self.executar_acao_bandeja(mensagem.get("action"))
         elif tipo == "settings_requested":
             # GAIA -> Mascot (botão "🧚 Mascot (LOKI)" do Painel, 2026-09-03) -
             # o modal de configurações agora é NATIVO daqui (`modal_
@@ -426,7 +434,7 @@ class MascotApp:
         menu = QMenu()
 
         acao_mostrar = QAction("Mostrar", menu, checkable=True, checked=True)
-        acao_mostrar.toggled.connect(lambda ativo: self.window.show() if ativo else self.window.hide())
+        acao_mostrar.toggled.connect(self.window.setVisible)
         menu.addAction(acao_mostrar)
 
         acao_click_through = QAction("Clique-através", menu, checkable=True, checked=self.window.click_through_ativo)
@@ -437,7 +445,7 @@ class MascotApp:
         acao_centralizar.triggered.connect(self._centralizar_janela)
         menu.addAction(acao_centralizar)
 
-        acao_modo_seguro = QAction("Modo seguro (pausar autonomia)", menu, checkable=True)
+        acao_modo_seguro = QAction("Modo seguro (pausar autonomia)", menu, checkable=True, checked=self.modo_seguro_ativo)
         acao_modo_seguro.toggled.connect(self._alternar_modo_seguro)
         menu.addAction(acao_modo_seguro)
 
@@ -516,10 +524,39 @@ class MascotApp:
             area.y() + (area.height() - self.window.height()) // 2,
         )
 
+    @property
+    def modo_seguro_ativo(self) -> bool:
+        return self._autonomia_antes_modo_seguro is not None
+
     def _alternar_modo_seguro(self, ativo: bool) -> None:
-        self.config_mascot["autonomy"] = "parada" if ativo else config.MASCOT_PADRAO["autonomy"]
+        """Pausa a autonomia sem perder a escolhida pelo usuário: ao sair do
+        modo seguro, volta a autonomia de antes (antes voltava sempre à de
+        fábrica, mesmo com "parada" escolhida nas Configurações)."""
+        if ativo == self.modo_seguro_ativo:
+            return
         if ativo:
+            self._autonomia_antes_modo_seguro = self.config_mascot.get("autonomy", config.MASCOT_PADRAO["autonomy"])
+            self.config_mascot["autonomy"] = "parada"
             self.window.definir_click_through(False)
+        else:
+            self.config_mascot["autonomy"] = self._autonomia_antes_modo_seguro
+            self._autonomia_antes_modo_seguro = None
+
+    def executar_acao_bandeja(self, acao) -> bool:
+        """Comandos da bandeja vindos da GAIA (`tray_action`), os mesmos da
+        bandeja própria. Ação desconhecida vira log, nunca exceção."""
+        acoes = {
+            "centralizar": self._centralizar_janela,
+            "alternar_visibilidade": lambda: self.window.setVisible(not self.window.isVisible()),
+            "alternar_clique_atraves": lambda: self.window.definir_click_through(not self.window.click_through_ativo),
+            "alternar_modo_seguro": lambda: self._alternar_modo_seguro(not self.modo_seguro_ativo),
+        }
+        executar = acoes.get(acao)
+        if executar is None:
+            logging.getLogger(__name__).warning("Ação de bandeja desconhecida vinda da GAIA: %r", acao)
+            return False
+        executar()
+        return True
 
 
 def main() -> int:

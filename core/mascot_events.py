@@ -126,6 +126,23 @@ def evento_settings_requested() -> dict:
     return {"type": "settings_requested"}
 
 
+# Comandos da bandeja (2026-11-14). Ligado pela GAIA, o LOKI não tem ícone
+# próprio na área de notificação (`LOKI_SEM_ICONE_BANDEJA=1`, regra do
+# ecossistema): o que a bandeja dele fazia sai do item LOKI em Sentinelas,
+# na bandeja da GAIA, e chega por aqui.
+ACOES_BANDEJA = frozenset({
+    "centralizar", "alternar_visibilidade", "alternar_clique_atraves", "alternar_modo_seguro",
+})
+
+
+def evento_tray_action(acao: str) -> dict:
+    """GAIA -> Mascot: executa um comando que antes ficava na bandeja do
+    próprio LOKI. `acao` precisa estar em `ACOES_BANDEJA`."""
+    if acao not in ACOES_BANDEJA:
+        raise ValueError(f"ação de bandeja desconhecida: {acao}")
+    return {"type": "tray_action", "action": acao}
+
+
 def evento_user_message(id: str, text: str, channel: str = "voz") -> dict:
     """GAIA -> Mascot (2026-09-01, achado ao vivo: "falou no modo de voz, mas
     não apareceu no CompanionPanel") - eco de um turno que NÃO veio do

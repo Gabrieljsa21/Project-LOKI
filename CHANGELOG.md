@@ -16,6 +16,17 @@ Versionamento: [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-14
+
+### Adicionado
+
+- **LOKI dentro da bandeja da GAIA:** ligado pela GAIA (`LOKI_SEM_ICONE_BANDEJA=1`, que o `MascotSupervisor` passa a partir da GAIA 0.76.0), o LOKI não cria ícone próprio na área de notificação, seguindo a regra do ecossistema. Os comandos da bandeja dele chegam pelo evento novo `tray_action` (`core/mascot_events.py`: `evento_tray_action`, `ACOES_BANDEJA`): Centralizar, Mostrar/ocultar, Clique-através e Modo seguro. Aberto sozinho (`iniciar_loki.bat`), o ícone continua igual.
+- `testes/testar_bandeja_gaia.py`: ícone opcional, os quatro comandos pelo caminho do evento, ação desconhecida recusada e o ícone de volta sem a variável.
+
+### Corrigido
+
+- **Sair do Modo seguro trocava a autonomia escolhida:** voltava sempre à de fábrica ("sutil"), mesmo com outra escolhida nas Configurações. Agora volta a que estava antes.
+
 ## [0.2.0] - 2026-11-10
 
 ### Adicionado
