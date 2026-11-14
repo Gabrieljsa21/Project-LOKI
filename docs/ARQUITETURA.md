@@ -110,6 +110,14 @@ novo for adicionado num lado, precisa ser replicado no outro.
 `testes/testar_contrato_gaia.py` compara o código das duas cópias
 (ignorando docstrings) quando o checkout da GAIA está ao lado.
 
+Ligado pela GAIA (`LOKI_SEM_ICONE_BANDEJA=1`, 2026-11-14), o LOKI não
+monta o `QSystemTrayIcon` (`MascotApp.tray` fica `None`): regra do
+ecossistema, todo satélite que a GAIA liga fica dentro da bandeja dela. Os
+comandos da bandeja antiga chegam pelo evento `tray_action`, despachados por
+`MascotApp.executar_acao_bandeja`, que a bandeja própria (LOKI aberto
+sozinho) e o evento usam pelo mesmo caminho. `ACOES_BANDEJA` no contrato é a
+lista fechada: ação fora dela é recusada nos dois lados.
+
 O `ready` do handshake leva o PID do processo (`pid`, 2026-11-10). O
 `pythonw.exe` do venv é um trampolim do uv, e "Reiniciar Mascot" troca o
 processo sem a GAIA participar; com o PID informado, o `MascotSupervisor`

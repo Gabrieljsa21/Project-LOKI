@@ -75,9 +75,16 @@ Brilho ao redor da personagem conforme o modo de voz ativo na GAIA.
 
 ## Bandeja do sistema
 
-Mostrar, Clique-através, Centralizar, Modo seguro (pausa a autonomia),
-Velocidade de voo (100% a 500%), Forçar animação, Configurações, Reiniciar
-Mascot e Sair.
+Ligado pela GAIA, o LOKI não tem ícone próprio: o controle fica na bandeja
+dela, em Sentinelas > LOKI, com Centralizar, Mostrar/ocultar, Clique-através,
+Modo seguro, Configurações e Reiniciar. Velocidade de voo fica nas
+Configurações (aba Movimento), forçar animação fica na roda de gestos
+(Menu SAO > Ações), e desligar fica no switch "🧚 Mascot (LOKI)" do Painel.
+
+Aberto sozinho (`iniciar_loki.bat`), ele tem ícone próprio com: Mostrar,
+Clique-através, Centralizar, Modo seguro (pausa a autonomia e, ao sair, volta
+a que estava), Velocidade de voo (100% a 500%), Forçar animação,
+Configurações, Reiniciar Mascot e Sair.
 
 ## Configurações
 
@@ -101,5 +108,7 @@ valem depois de reiniciar o Mascot.
   (mensagens, estado de voz, halo). Se a GAIA fechar, o LOKI fecha junto.
 - Reiniciar o Mascot pela bandeja ou pelas Configurações dele mantém o vínculo:
   o processo novo informa o PID e a GAIA passa a segui-lo.
+- Sem ícone próprio quando a GAIA o liga; os comandos da bandeja chegam pelo
+  canal (ver "Bandeja do sistema").
 - Rodando sozinho (`iniciar_loki.bat`), entra em modo demonstração: tudo
   funciona, menos a conversa.
