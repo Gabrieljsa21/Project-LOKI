@@ -1,6 +1,6 @@
 [project]
 name = "loki"
-version = "0.3.0"
+version = "0.3.1"
 description = "Galateia Mascot/LOKI - avatar animado flutuando no desktop, processo separado consumido pela GAIA via named pipe local."
 requires-python = ">=3.11"
 dependencies = [
