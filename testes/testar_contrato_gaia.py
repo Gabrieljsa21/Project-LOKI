@@ -3,7 +3,7 @@
 
 Compara o CÓDIGO (árvore sintática sem docstrings; comentários já não entram
 na árvore) de `core/mascot_events.py` e `mascot/protocol/transport.py` com os
-arquivos correspondentes do `assistant`. Sem o checkout da GAIA ao lado
+arquivos correspondentes da GAIA. Sem o checkout da GAIA ao lado
 (`PROJETO_GAIA_DIR` ou a pasta irmã padrão), o teste é pulado."""
 import ast
 import os
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-GAIA = Path(os.environ.get("PROJETO_GAIA_DIR", RAIZ.parent / "Project G.A.I.A" / "assistant"))
+GAIA = Path(os.environ.get("PROJETO_GAIA_DIR", RAIZ.parent / "Project-GAIA"))
 
 PARES = (
     (RAIZ / "core" / "mascot_events.py", GAIA / "core" / "mascot_events.py"),

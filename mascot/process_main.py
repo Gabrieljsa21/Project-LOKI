@@ -27,7 +27,6 @@ RAIZ_APP = Path(__file__).resolve().parents[1]
 if str(RAIZ_APP) not in sys.path:
     sys.path.insert(0, str(RAIZ_APP))
 
-CAMINHO_LOG = RAIZ_APP / "data" / "mascot.log"
 # Intervalo do watchdog de travada (2026-09-04, achado ao vivo: "ela trava
 # ate p sentar... no inicio ela ate parou de responder... travou na hora
 # de subir - coloca uns logs p ter mais precisao doq ela fez e qnt tempo
@@ -39,24 +38,6 @@ CAMINHO_LOG = RAIZ_APP / "data" / "mascot.log"
 # GC, ou qualquer outra coisa.
 INTERVALO_WATCHDOG_MS = 150
 LIMIAR_TRAVADA_MS = 300
-
-
-def configurar_logging() -> None:
-    """`pythonw.exe` não tem console - sem gravar em ARQUIVO, todo
-    `logger.info`/`.warning` espalhado pelo `mascot/` (vários módulos já
-    têm `logging.getLogger(__name__)`, mas ninguém nunca configurou um
-    HANDLER) ia parar no "handler de último recurso" do Python, que
-    escreve em stderr - inexistente aqui, ou seja, se perdia
-    silenciosamente. `mode="w"` (sobrescreve a cada processo novo, não
-    acumula entre sessões) - é um log de diagnóstico de UMA sessão, não
-    histórico permanente (isso já é papel do `CHANGELOG.md`)."""
-    CAMINHO_LOG.parent.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s.%(msecs)03d [%(name)s] %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-        handlers=[logging.FileHandler(CAMINHO_LOG, mode="w", encoding="utf-8")],
-    )
 
 
 def _instalar_watchdog_travada(app: QApplication) -> QTimer:
@@ -560,7 +541,10 @@ class MascotApp:
 
 
 def main() -> int:
-    configurar_logging()
+    # Log no padrão do ecossistema (0.4.0): %LOCALAPPDATA%\Ecossistema\LOKI\Logs,
+    # um arquivo por dia, 30 dias; print, stderr e exceções também vão para lá.
+    from mascot import registro
+    registro.configurar("LOKI")
     logging.getLogger("mascot.process_main").info("Mascot iniciando (PID %d)", os.getpid())
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # a bandeja continua viva com a janela oculta
