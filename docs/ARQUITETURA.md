@@ -371,7 +371,8 @@ janelas "sempre no topo" concorrentes (outro app também always-on-top,
 ex. overlay de app de chat) - `entrar()` (`_BolhaBase`) ganhou um
 `raise_()` explícito depois do `show()`. Logging novo (`logging.
 getLogger(__name__)` em `conversation_controller.py`/`bubble_stack.py`,
-grava em `data/mascot.log` como o resto do Mascot) registra estado antes/
+grava no log do dia em `%LOCALAPPDATA%\Ecossistema\LOKI\Logs` como o
+resto do Mascot) registra estado antes/
 depois de `entrar`/`sair`/`fechar_imediato`/envio/resposta e a posição
 exata de cada bubble criado - se acontecer de novo, o log tem a resposta
 em vez de precisar adivinhar por print de tela.

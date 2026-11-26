@@ -16,6 +16,16 @@ Versionamento: [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-26
+
+### Alterado
+
+- **Log no padrão do ecossistema:** sai `data/mascot.log` (recriado a cada início, o histórico se perdia) e entra `%LOCALAPPDATA%\Ecossistema\LOKI\Logs\AAAA-MM-DD.log`, fora do repositório, um arquivo por dia e 30 dias guardados, com limpeza ao iniciar. Linha no formato `AAAA-MM-DD hh:mm:ss,mmm NÍVEL módulo: mensagem`. `mascot/registro.py` é a cópia do modelo da CLIO (com a correção do laço quando o console herdado do `pythonw` falha); `print`, stderr e exceções não tratadas, inclusive de threads, também vão para o log. O log antigo foi movido para a pasta nova. Teste novo: `testes/testar_registro.py`.
+
+### Corrigido
+
+- `testes/testar_contrato_gaia.py` procurava a GAIA no caminho antigo (`Project G.A.I.A/assistant`) e pulava a comparação; agora usa `Project-GAIA`. Docs (`CLAUDE.md`, `docs/TODO.md`) sem as menções à pasta `assistant`.
+
 ## [0.3.1] - 2026-11-14
 
 ### Corrigido

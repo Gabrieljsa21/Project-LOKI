@@ -46,6 +46,8 @@ Sem um canal de comunicação configurado, o LOKI abre em modo de demonstração
 
 As configurações e a posição ficam em `data/mascot_config.json` e `data/mascot_posicao.json`.
 
+O log fica em `%LOCALAPPDATA%\Ecossistema\LOKI\Logs\`, um arquivo por dia (`AAAA-MM-DD.log`), guardado por 30 dias.
+
 ## Testes
 
 ```powershell

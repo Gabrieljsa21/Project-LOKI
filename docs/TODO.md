@@ -3,7 +3,7 @@
 Só pendências. Item concluído sai daqui: funcionalidade vai para
 `FUNCIONALIDADES.md`, correção vai para o `CHANGELOG.md`. Pendências do lado
 da GAIA (imagem anexada no Modo em Grupo, modelo de visão fixo no código)
-ficam em `assistant/docs/TODO.md`, seção Mascot/LOKI.
+ficam no `docs/TODO.md` da GAIA, seção Mascot/LOKI.
 
 ## Validação ao vivo
 
@@ -104,7 +104,7 @@ em toda máquina, além de consumir a cota de LFS do GitHub.
 **Complexidade**: Baixa
 **Status**: a chave `companion_panel_shortcut` e o apelido
 `MascotApp.companion_panel` continuam por compatibilidade (config salva,
-Painel da GAIA e `assistant/testes/testar_mascot_protocolo.py`). Renomear
+Painel da GAIA e `testes/testar_mascot_protocolo.py` da GAIA). Renomear
 exige mudar os dois repositórios juntos e migrar a config salva.
 
 ### Dividir `behavior_scheduler.py` e `menu_sao.py`
